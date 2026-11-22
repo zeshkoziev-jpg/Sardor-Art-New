@@ -294,11 +294,45 @@ function auth(required = true) {
 }
 
 app.post('/api/auth/start', rateLimit(10), async (req, res) => {
-  const { role } = req.body;
-  const nonce = crypto.randomBytes(16).toString('hex');
-  DATA.authNonces[nonce] = { role, createdAt: Date.now(), status: 'pending' };
-  await saveData();
-  res.json({ nonce, url: `https://t.me/${AUTH_BOT_USERNAME}?start=${nonce}` });
+  try {
+    const { role } = req.body || {};
+    const nonce = crypto.randomBytes(16).toString('hex');
+    DATA.authNonces[nonce] = { role, createdAt: Date.now(), status: 'pending' };
+    await saveData();
+    res.json({ nonce, url: `https://t.me/${AUTH_BOT_USERNAME}?start=${nonce} `});
+  } catch (err) {
+    console.error('Auth start xatosi:', err);
+    res.status(500).json({ error: 'Serverda xatolik yuz berdi. Iltimos keyinroq urinib ko\'ring.' });
+  }
+});
+
+app.get('/api/auth/status', (req, res) => {
+  const auth = DATA.authNonces[req.query.nonce];
+  res.json({ status: auth ? auth.status : 'not_found' });
+});
+
+app.post('/api/auth/verify', rateLimit(10), async (req, res) => {
+  try {
+    const { nonce, code } = req.body;
+    const auth = DATA.authNonces[nonce];
+    if (!auth || Date.now() - auth.createdAt > 600000) return res.status(400).json({ error: 'Kod muddati o\'tgan' });
+    
+    const hash = crypto.createHash('sha256').update(String(code)).digest('hex');
+    if (hash !== auth.codeHash) return res.status(400).json({ error: 'Kod xato' });
+    
+    const token = crypto.randomBytes(32).toString('hex');
+    DATA.sessions[token] = { phone: auth.phone, role: auth.role, createdAt: Date.now() };
+    DATA.users[auth.phone] = { ...DATA.users[auth.phone], phone: auth.phone, role: auth.role, telegramId: auth.chatId };
+    
+    delete DATA.authNonces[nonce]; 
+    await saveData();
+    
+    sendTgMsg(AUTH_BOT_TOKEN, auth.chatId,` ✅ Muvaffaqiyatli ro'yxatdan o'tdingiz!`, { inline_keyboard: [[{ text: "🌐 Saytga qaytish", url: SITE_URL }]] });
+    res.json({ token });
+  } catch (err) {
+    console.error('Auth verify xatosi:', err);
+    res.status(500).json({ error: 'Serverda xatolik yuz berdi.' });
+  }
 });
 app.get('/api/auth/status', (req, res) => {
   const auth = DATA.authNonces[req.query.nonce];

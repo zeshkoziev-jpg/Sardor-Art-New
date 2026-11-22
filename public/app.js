@@ -1,3 +1,4 @@
+console.log("APP.JS YUKLANDI V2");
 (function () {
   'use strict';
 
@@ -12,10 +13,10 @@
       cart_total: 'Jami', required: 'Iltimos, maydonlarni to\'ldiring', login_needed: 'Tizimga kiring',
       order_success: 'Buyurtma qabul qilindi!', error_generic: 'Xatolik yuz berdi', image_req: 'Rasm tanlang',
       name: 'Ism', phone: 'Telefon', address: 'Manzil', my_works: 'Mening asarlarim', no_works: 'Hozircha asarlaringiz yo\'q',
-      product_name: 'Asar nomi', price: 'Narx (so\'m)', genre: `Bo'limlar`, payment_type: 'To\'lov turi', public: 'Ommaga taqdim etish',
+      product_name: 'Asar nomi', price: 'Narx (so\'m)', genre: `BO'LIMLAR`, payment_type: 'To\'lov turi', public: 'Ommaga taqdim etish',
       seller_panel: 'Savdogar paneli', sold_items: 'Sotilganlar', buyer: 'Mijoz', map: 'Xarita', payment_info: 'To\'lov ma\'lumoti',
       upfront: 'Oldindan to\'lov', remaining: 'Keyin to\'lash', choose_role: 'Rolni tanlang', customer_role: 'Mijoz',
-      seller_role: 'Savdogar', enter_code: 'Tasdiqlash kodini kiriting', verify: 'Tasdiqlash', success_auth: 'Muvaffaqiyatli kirdingiz!', waiting_tg: 'Telegramda botga o\'ting va raqamingizni yuboring...'
+      seller_role: 'Savdogar', enter_code: 'Tasdiqlash kodini kiriting', verify: 'Tasdiqlash', success_auth: 'Muvaffaqiyatli kirdingiz!', waiting_tg: 'Telegram botga o\'ting va raqamingizni yuboring...'
     },
     ru: {
       home: 'Главная', profile: 'Профиль', cart: 'Корзина', logout: 'Выйти', seller: 'Продавец', sold: 'Продано',
@@ -39,13 +40,13 @@
       search: 'Search', add_to_cart: 'Add to Cart', buy: 'Buy', remove: 'Remove',
       checkout: 'Checkout', submit_order: 'Submit Order', get_location: 'Get Location',
       save: 'Save', create: 'Create', empty_catalog: 'Nothing found', cart_empty: 'Cart is empty',
-      cart_total: 'Total', required: 'Fill the fields', login_needed: 'Please login',
+      cart_total: 'Total', required: 'Fill the fields', login_needed: 'Please log in',
       order_success: 'Order placed!', error_generic: 'Error', image_req: 'Select image',
       name: 'Name', phone: 'Phone', address: 'Address', my_works: 'My Works', no_works: 'You have no works yet',
       product_name: 'Name', price: 'Price (sum)', genre: 'Genre', payment_type: 'Payment Type', public: 'Publish',
       seller_panel: 'Seller Panel', sold_items: 'Sold Items', buyer: 'Buyer', map: 'Map', payment_info: 'Payment Info',
       upfront: 'Upfront', remaining: 'Remaining', choose_role: 'Choose Role', customer_role: 'Customer',
-      seller_role: 'Seller', enter_code: 'Enter Code', verify: 'Verify', success_auth: 'Login successful!', waiting_tg: 'Go to bot and send phone...'
+      seller_role: 'Seller', enter_code: 'Enter Code', verify: 'Verify', success_auth: 'Login successful!', waiting_tg: 'Go to the bot and send your phone number...'
     }
   };
 
@@ -61,39 +62,48 @@
     const token = getToken();
     if (!token) return;
     try {
-      const res = await fetch('/api/me', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch('/api/me', { headers: { [`Authorization`] : `Bearer ${token}` } });
       if (res.ok) AUTH_USER = (await res.json()).user;
       else localStorage.removeItem('token');
     } catch {}
   }
 
   async function api(url, opts = {}) {
-    const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
-    const token = getToken();
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    let body = opts.body;
-    if (body && typeof body === 'object' && !(body instanceof FormData)) {
-      body = JSON.stringify(body);
-    }
-    const res = await fetch(url, { ...opts, headers, body });
+  const headers = { ...(opts.headers) };
+if (!(opts.body instanceof FormData)) {
+  headers['Content-Type'] = 'application/json';
+}
+  const token = getToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  
+  try {
+    const res = await fetch(url, { ...opts, headers });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || 'Xatolik');
+    if (!res.ok) {
+      throw new Error(data.error || `Server xatosi: ${res.status}`);
+    }
     return data;
+  } catch (err) {
+    if (err.name === 'TypeError') throw new Error('Server uyg\'onmoqda yoki internet uzildi...');
+    throw err;
   }
+}
 
   function toast(msg) {
     let el = document.querySelector('.toast');
     if (!el) { el = document.createElement('div'); el.className = 'toast'; document.body.appendChild(el); }
     el.textContent = msg;
     el.style.opacity = 1;
-    setTimeout(() => el.style.opacity = 0, 3000);
+    setTimeout(() => { el.style.opacity = 0; }, 3000);
   }
 
   const getCart = () => JSON.parse(localStorage.getItem('cart') || '[]');
   const setCart = (c) => { localStorage.setItem('cart', JSON.stringify(c)); updateCartBadge(); };
   function addToCart(item) {
-    const c = getCart(); const f = c.find(x => x.id === item.id);
-    if (f) f.qty += 1; else c.push({ ...item, qty: 1 });
+    const c = getCart();
+    const f = c.find(x => x.id === item.id);
+    if (f) f.qty += 1;
+    else c.push({ ...item, qty: 1 });
     setCart(c);
   }
   function updateCartBadge() {
@@ -129,9 +139,9 @@
     document.getElementById('logout-btn')?.addEventListener('click', () => { localStorage.removeItem('token'); location.href = '/'; });
     const searchInput = document.getElementById('search-input');
     const urlQ = new URLSearchParams(location.search).get('q');
-    if (urlQ && searchInput) searchInput.value = urlQ;
+    if (urlQ) searchInput.value = urlQ;
     let timer;
-    searchInput?.addEventListener('input', (e) => {
+    searchInput.addEventListener('input', (e) => {
       clearTimeout(timer);
       timer = setTimeout(() => {
         const q = e.target.value.trim();
@@ -146,7 +156,7 @@
     const host = document.getElementById('main-footer');
     if (!host) return;
     const lang = getLang();
-    let phone = '+998 90 123 45 67';
+    let phone = '+998 94 140 12 13 ';
     try { const res = await fetch('/api/config'); const data = await res.json(); if (data.phone) phone = data.phone; } catch (e) {}
     host.innerHTML = `
       <div class="footer-inner">
@@ -159,7 +169,9 @@
         </div>
       </div>
     `;
-    host.querySelectorAll('.lang-switch button').forEach(btn => btn.onclick = () => { localStorage.setItem('lang', btn.dataset.lang); location.reload(); });
+    host.querySelectorAll('.lang-switch button').forEach(btn => {
+      btn.onclick = () => { localStorage.setItem('lang', btn.dataset.lang); location.reload(); };
+    });
   }
 
   function initBgAnimation() {
@@ -186,6 +198,7 @@
     let currentGenre = 'all';
     const grid = document.getElementById('products-grid');
     const empty = document.getElementById('empty-msg');
+
     async function load(query = '') {
       try {
         const res = await api(`/api/products?q=${encodeURIComponent(query)}&genre=${currentGenre}`);
@@ -200,6 +213,7 @@
         }).join('');
       } catch (e) { toast(e.message); }
     }
+
     if (sidebar) {
       sidebar.addEventListener('click', (e) => {
         if (e.target.tagName === 'LI') {
@@ -219,7 +233,7 @@
   async function initProduct() {
     const id = new URLSearchParams(location.search).get('id');
     const host = document.getElementById('product-detail');
-    if (!id) return host.innerHTML = '<p>Xato</p>';
+    if (!id) return host.innerHTML = '<p>Xatolik</p>';
     try {
       const res = await api(`/api/products/${id}`);
       const p = res.product;
@@ -227,7 +241,7 @@
       if (p.discount > 0) {
         priceHtml = `<div class="price" style="color:#ff4d4f;">${fmtMoney(p.price)} <span style="text-decoration:line-through; color:#888; font-size:20px; margin-left:10px;">${fmtMoney(p.originalPrice)}</span><span style="background:#ff4d4f; color:white; padding:3px 8px; border-radius:5px; font-size:16px; margin-left:10px;">-${p.discount}%</span></div>`;
       }
-      let descHtml = p.description ? `<div class="mt-2" style="line-height:1.6; color:#aaa; margin-bottom:20px;">${esc(p.description)}</div>` : '';
+      const descHtml = p.description ? `<div class="mt-2" style="line-height:1.6; color:#aaa; margin-bottom:20px;">${esc(p.description)}</div>` : '';
       host.innerHTML = `
         <div class="product-layout">
           <div class="product-image"><img src="${p.image}" alt="${esc(p.name)}"></div>
@@ -241,7 +255,7 @@
           </div>
         </div>`;
       document.getElementById('add-btn').onclick = () => { addToCart({ id: p.id, name: p.name, price: p.price, image: p.image, paymentType: p.paymentType }); toast(t('add_to_cart')); };
-    } catch (e) { host.innerHTML = `<p>${e.message}</p>`; }
+    } catch (e) { host.innerHTML = `<p>${esc(e.message)}</p>`; }
   }
 
   function initCart() {
@@ -285,7 +299,7 @@
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
         <div>
           <div class="form-group"><label>${t('name')}</label><input type="text" id="c-name" class="input"></div>
-          <div class="form-group"><label>${t('phone')}</label><input type="text" id="c-phone" class="input" value="${AUTH_USER?.phone || ''}"></div>
+          <div class="form-group"><label>${t('phone')}</label><input type="text" id="c-phone" class="input" value="${esc(AUTH_USER?.phone || '')}"></div>
           <button class="btn btn-primary" id="loc-btn">${t('get_location')}</button>
           <div id="map-preview" style="margin-top: 15px;"></div>
         </div>
@@ -313,10 +327,10 @@
       const phone = document.getElementById('c-phone').value.trim();
       if (!name || !phone) return toast(t('required'));
       try {
-        await api('/api/orders', { method: 'POST', body: { items: cart.map(x => ({ id: x.id, qty: x.qty, name: x.name })), buyerName: name, buyerPhone: phone, lat, lng } });
+        await api('/api/orders', { method: 'POST', body: JSON.stringify({ items: cart.map(x => ({ id: x.id, qty: x.qty, name: x.name })), buyerName: name, buyerPhone: phone, lat, lng }) });
         localStorage.removeItem('cart');
         toast(t('order_success'));
-        setTimeout(() => location.href = '/', 1000);
+        setTimeout(() => { location.href = '/'; }, 1000);
       } catch (e) { toast(e.message); }
     };
   }
@@ -347,19 +361,26 @@
     `;
     const startAuth = async (role) => {
       const statusDiv = document.getElementById('auth-status');
-      statusDiv.classList.remove('hidden'); statusDiv.textContent = t('waiting_tg');
+      statusDiv.classList.remove('hidden');
+      statusDiv.textContent = t('waiting_tg');
       try {
-        const res = await api('/api/auth/start', { method: 'POST', body: { role } });
-        if (res.url) window.open(res.url, '_blank');
+        const res = await api('/api/auth/start', { method: 'POST', body: JSON.stringify({ role }) });
+        window.open(res.url, '_blank');
         const interval = setInterval(async () => {
           try {
-            const s = await api(`/api/auth/status?nonce=${res.nonce}`);
-            if (s.status === 'waiting_code') { clearInterval(interval); location.href = `/login.html?nonce=${res.nonce}`; }
+            const s = await api(`/api/auth/status?nonce=${encodeURIComponent(res.nonce)}`);
+            if (s.status === 'waiting_code') {
+              clearInterval(interval);
+              location.href = `/login.html?nonce=${encodeURIComponent(res.nonce)}`;
+            }
           } catch (e) {}
         }, 2000);
         setTimeout(() => clearInterval(interval), 10 * 60 * 1000);
-      } catch (e) { statusDiv.textContent = "Xatolik: " + e.message; }
+      } catch (e) {
+        statusDiv.textContent = 'Xatolik: ' + e.message;
+      }
     };
+
     document.getElementById('role-cust').onclick = () => startAuth('customer');
     document.getElementById('role-sell').onclick = () => startAuth('seller');
   }
@@ -367,7 +388,8 @@
   function initLogin() {
     const host = document.getElementById('main-content');
     const nonce = new URLSearchParams(location.search).get('nonce');
-    if (!nonce) return host.innerHTML = '<p>Xato</p>';
+    if (!nonce) return host.innerHTML = '<p>Xatolik</p>';
+
     host.innerHTML = `
       <div class="card" style="max-width: 400px; margin: 40px auto; text-align: center; padding: 30px;">
         <h2>${t('enter_code')}</h2>
@@ -376,21 +398,25 @@
         <p id="err-msg" style="color:var(--danger); margin-top:10px;"></p>
       </div>
     `;
+
     document.getElementById('verify-btn').onclick = async () => {
       const code = document.getElementById('code-input').value.trim();
       if (!/^\d{6}$/.test(code)) return;
       try {
-        const res = await api('/api/auth/verify', { method: 'POST', body: { nonce, code } });
+        const res = await api('/api/auth/verify', { method: 'POST', body: JSON.stringify({ nonce, code }) });
         localStorage.setItem('token', res.token);
         toast(t('success_auth'));
-        setTimeout(() => location.href = '/', 1000);
-      } catch (e) { document.getElementById('err-msg').textContent = e.message; }
+        setTimeout(() => { location.href = '/'; }, 1000);
+      } catch (e) {
+        document.getElementById('err-msg').textContent = e.message;
+      }
     };
   }
 
   function initSeller() {
     const host = document.getElementById('main-content');
     if (!AUTH_USER || AUTH_USER.role !== 'seller') return host.innerHTML = '<p>Ruxsat yo\'q. Iltimos, Profil bo\'limidan Savdogar rolini tanlang.</p>';
+
     host.innerHTML = `
       <h2>${t('seller_panel')}</h2>
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top:20px;">
@@ -420,37 +446,58 @@
         <div><h3>${t('my_works')}</h3><div id="my-list" style="margin-top:15px;"></div></div>
       </div>
     `;
+
     let base64Img = null;
     document.getElementById('p-img').onchange = (e) => {
-      const file = e.target.files[0]; if (!file) return;
+      const file = e.target.files[0];
+      if (!file) return;
       const reader = new FileReader();
       reader.onload = (ev) => {
         const img = new Image();
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          let w = img.width, h = img.height, max = 900;
+          let w = img.width, h = img.height;
+          const max = 900;
           if (w > max || h > max) { if (w > h) { h = h * max / w; w = max; } else { w = w * max / h; h = max; } }
-          canvas.width = w; canvas.height = h; canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
           base64Img = canvas.toDataURL('image/jpeg', 0.85);
-          const prev = document.getElementById('p-preview'); prev.src = base64Img; prev.classList.remove('hidden');
+          const prev = document.getElementById('p-preview');
+          prev.src = base64Img;
+          prev.classList.remove('hidden');
         };
         img.src = ev.target.result;
       };
       reader.readAsDataURL(file);
     };
+
     const loadMy = async () => {
-      const res = await api('/api/seller/products');
-      const list = document.getElementById('my-list');
-      if (!res.products.length) return list.innerHTML = `<p>${t('no_works')}</p>`;
-      list.innerHTML = res.products.map(p => {
-        let discBadge = p.discount > 0 ? `<span style="background:#ff4d4f; color:white; padding:2px 5px; border-radius:5px; font-size:12px; margin-left:5px;">-${p.discount}%</span>` : '';
-        return `<div class="cart-item" style="padding:10px; margin-bottom:10px;"><img src="${p.image}" style="width:60px; height:60px;"><div style="flex:1;"><b>${esc(p.name)}</b> ${discBadge}<br><small>${t(p.genre)}</small></div><button class="btn btn-danger" onclick="deleteProduct('${p.id}')">X</button></div>`;
-      }).join('');
+      try {
+        const res = await api('/api/seller/products');
+        const list = document.getElementById('my-list');
+        if (!res.products.length) return list.innerHTML = `<p>${t('no_works')}</p>`;
+
+        list.innerHTML = res.products.map(p => {
+          const discBadge = p.discount > 0 ? `<span style="background:#ff4d4f; color:white; padding:2px 5px; border-radius:5px; font-size:12px; margin-left:5px;">-${p.discount}%</span>` : '';
+          return `<div class="cart-item" style="padding:10px; margin-bottom:10px;">
+            <img src="${p.image}" style="width:60px; height:60px;">
+            <div style="flex:1;"><b>${esc(p.name)}</b> ${discBadge}<br><small>${t(p.genre)}</small></div>
+            <button class="btn btn-danger" data-del="${p.id}">X</button>
+          </div>`;
+        }).join('');
+
+        list.querySelectorAll('[data-del]').forEach(btn => {
+          btn.onclick = async () => {
+            if (!confirm('O\'chirishni tasdiqlaysizmi?')) return;
+            try {
+              await api(`/api/seller/products/${encodeURIComponent(btn.dataset.del)}`, { method: 'DELETE' });
+              toast('O\'chirildi'); loadMy();
+            } catch (e) { toast(e.message); }
+          };
+        });
+      } catch (e) { toast(e.message); }
     };
-    window.deleteProduct = async (id) => {
-      if (!confirm('O\'chirish?')) return;
-      await api(`/api/seller/products/${id}`, { method: 'DELETE' }); loadMy();
-    };
+
     document.getElementById('p-save').onclick = async () => {
       const name = document.getElementById('p-name').value.trim();
       const price = parseInt(document.getElementById('p-price').value, 10);
@@ -458,15 +505,22 @@
       const description = document.getElementById('p-desc').value.trim();
       const genre = document.getElementById('p-genre').value;
       const paymentType = document.getElementById('p-payment').value;
+
       if (!name || !price || !base64Img) return toast(t('required'));
+
       try {
-        await api('/api/seller/products', { method: 'POST', body: { name, price, discount, description, genre, paymentType, image: base64Img } });
-        toast('OK'); loadMy();
-        document.getElementById('p-name').value = ''; document.getElementById('p-price').value = '';
-        document.getElementById('p-discount').value = '0'; document.getElementById('p-desc').value = '';
-        base64Img = null; document.getElementById('p-preview').classList.add('hidden');
+        await api('/api/seller/products', { method: 'POST', body: JSON.stringify({ name, price, discount, description, genre, paymentType, image: base64Img }) });
+        toast('OK');
+        loadMy();
+        document.getElementById('p-name').value = '';
+        document.getElementById('p-price').value = '';
+        document.getElementById('p-discount').value = '0';
+        document.getElementById('p-desc').value = '';
+        base64Img = null;
+        document.getElementById('p-preview').classList.add('hidden');
       } catch (e) { toast(e.message); }
     };
+
     loadMy();
   }
 
@@ -482,9 +536,9 @@
           <p><strong>${t('price')}:</strong> ${fmtMoney(o.price)}</p>
           <p><strong>${t('payment_type')}:</strong> ${t(o.paymentType)}</p>
           <p><strong>${t('buyer')}:</strong> ${esc(o.buyerName)} (${esc(o.buyerPhone)})</p>
-          <iframe width="100%" height="150" style="border:0;border-radius:8px; margin-top:10px;" src="https://www.google.com/maps?q=${o.lat},${o.lng}&z=15&output=embed"></iframe>
+          ${o.lat && o.lng ? `<iframe width="100%" height="150" style="border:0;border-radius:8px; margin-top:10px;" src="https://www.google.com/maps?q=${o.lat},${o.lng}&z=15&output=embed"></iframe>` : ''}
         </div>`).join('') + '</div>';
-    } catch (e) { host.innerHTML = `<p>${e.message}</p>`; }
+    } catch (e) { host.innerHTML = `<p>${esc(e.message)}</p>`; }
   }
 
   (async () => {
