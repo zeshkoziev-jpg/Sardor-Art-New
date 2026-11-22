@@ -405,7 +405,7 @@ app.post('/api/orders', auth(), rateLimit(10), async (req, res) => {
     const order = { id: crypto.randomBytes(8).toString('hex'), productId: p.id, productName: p.name, price: finalPrice, paymentType: p.paymentType, buyerName, buyerPhone, lat, lng, sellerPhone: p.sellerPhone, createdAt: Date.now() };
     DATA.orders.push(order); createdOrders.push(order);
     const seller = DATA.users[p.sellerPhone];
-    if (seller && seller.telegramId) sendTgMsg(AUTH_BOT_TOKEN, seller.telegramId, `🎉 Asar sotildi!\n${p.name}\nMijoz: ${buyerName}`);
+    if (seller && seller.telegramId) sendTgMsg(AUTH_BOT_TOKEN, seller.telegramId, `🎉 Asar sotildi!\n\nSurat nomi:${p.name}\nMijoz: ${buyerName}\nTelfon: ${buyerPhone}\n\n Mijoz bilan 24 soat ichida bog'laning iltimot.`);
   }
   await saveData(); res.json({ ok: true, orders: createdOrders });
 });
