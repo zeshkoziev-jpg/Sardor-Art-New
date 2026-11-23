@@ -23,7 +23,7 @@ const AUTH_BOT_USERNAME = process.env.AUTH_BOT_USERNAME || 'SardorArt_Bot';
 const ORDER_BOT_TOKEN = process.env.ORDER_BOT_TOKEN;
 const ORDER_BOT_USERNAME = process.env.ORDER_BOT_USERNAME || 'SardorOrderBot';
 const SITE_URL = process.env.SITE_URL || `http://localhost:${PORT}`;
-const ADMIN_CHAT_ID = '8857301370';
+const ADMIN_CHAT_ID = '8631399966';
 
 const DATA_FILE = path.join(__dirname, 'data.json');
 let DATA = { users: {}, sessions: {}, authNonces: {}, products: [], orders: [], botStates: {} };
@@ -252,45 +252,46 @@ async function handleOrderUpdate(update) {
       }
 
       // Lokatsiya yoki Venue (Joy nomi bilan lokatsiya) kelganda
-      if (state.step === 'address' && (msg.location || msg.venue || msg.text)) {
-        let addressStr = '';
-        
-        if (msg.location) {
-          addressStr = `Lokatsiya: https://www.google.com/maps?q=${msg.location.latitude},${msg.location.longitude}`;
-        } else if (msg.venue) {
-          addressStr = `Joy: ${msg.venue.title}, ${msg.venue.address}\nLokatsiya: https://www.google.com/maps?q=${msg.venue.location.latitude},${msg.venue.location.longitude}`;
-        } else {
-          addressStr = msg.text;
-        }
-        
-        state.data.address = addressStr;
-        
-        const sizePrices = { 
-          '400': '400,000', 
-          '600': '600,000', 
-          '900': '900,000', 
-          '1200': '1,200,000', 
-          '1800': '1,800,000', 
-          '2500': '2,500,000' 
-        };
-        const price = sizePrices[state.data.size] || 'Kelishilgan holda';
-        
-        const summary = `🎨 Yangi ZAKAZ!\n\nJanr: ${state.data.genre}\nO'lcham: ${state.data.size}\nMavzu: ${state.data.theme}\nTel: ${state.data.phone}\nManzil: ${state.data.address}`;
-        
-        // Adminga yuborish
-        await sendTgMsg(ORDER_BOT_TOKEN, ADMIN_CHAT_ID, summary);
+     if (state.step === 'address' && `(msg.location  msg.venue  msg.text)`) {
+  let addressStr = '';
+  if (msg.location) {
+    addressStr = `📍 Lokatsiya: https://www.google.com/maps?q=${msg.location.latitude},${msg.location.longitude}`;
+  } else if (msg.venue) {
+    addressStr = `📍 Joy: ${msg.venue.title}\nhttps://www.google.com/maps?q=${msg.venue.location.latitude},${msg.venue.location.longitude}`;
+  } else {
+    addressStr = `📍 Manzil: ${msg.text}`;
+  }
+  
+  state.data.address = addressStr;
+  
+  const sizePrices = { '400': '400,000', '600': '600,000', '900': '900,000', '1200': '1,200,000', '1800': '1,800,000', '2500': '2,500,000' };
+  const price = sizePrices[state.data.size] || 'Kelishilgan holda';
+  
+  const summary = `🎨 Yangi ZAKAZ!\n\nJanr: ${state.data.genre}\nO'lcham: ${state.data.size}\nMavzu: ${state.data.theme}\nTel: ${state.data.phone}\n${state.data.address}`;
+  
+  // 1. ADMINGA XABAR YUBORISH (Alohida himoyalangan)
+  try {
+    await sendTgMsg(ORDER_BOT_TOKEN, ADMIN_CHAT_ID, summary);
+  } catch (e) { 
+    console.error("Adminga xabar yuborishda xato (Botga start bosilganmi?):", e); 
+  }
 
-        // Foydalanuvchiga rahmat aytish
-        const finalMsg = `Xush kelibsiz! Ma'lumotlaringiz qabul qilindi.\n\nTaxminiy narxi: <b>${price} so'm</b>\n\nTez orada aloqaga chiqamiz. Minnatdorchilik bildiramiz!\n\nBizning ijtimoiy tarmoqlar:\nTelegram: https://t.me/sardor_artest_uz\nInstagram: https://www.instagram.com/sardor_art_painter`;
-        
-        await sendTgMsg(ORDER_BOT_TOKEN, chatId, finalMsg, { 
-          inline_keyboard: [[{ text: "Saytga qaytish", url: SITE_URL }]] 
-        });
-        
-        delete DATA.botStates[chatId];
-        await saveData();
-        return;
-      }
+  // 2. MIJOZGA MINNATDORCHILIK BILDIRISH
+  const finalMsg = `✅ Buyurtmangiz qabul qilindi!\n\n<b>Janr: ${state.data.genre}\n O'lcham: ${state.data.size} sm\n<b>Mavzu:</b> ${state.data.theme}\n<b>Taxminiy narxi: ${price} so'm\n\nTez orada mutaxassislarimiz siz bilan aloqaga chiqishadi. SARDOR ART ni tanlaganingiz uchun tashakkur!\n\n🌐 Telegram: https://t.me/sardor_artest_uz\n📸 Instagram: https://www.instagram.com/sardor_art_painter`;
+  
+  try {
+    await sendTgMsg(ORDER_BOT_TOKEN, chatId, finalMsg, { 
+      inline_keyboard: [[{ text: "🌐 Saytga qaytish", url: SITE_URL }]] 
+    });
+  } catch (e) { 
+    console.error("Mijozga xabar yuborishda xato:", e); 
+  }
+
+  // Sessiyani tozalash
+  delete DATA.botStates[chatId];
+  await saveData();
+  return;
+}
     }
   } catch (err) {
     console.error('Order bot xatosi:', err);
