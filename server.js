@@ -99,30 +99,29 @@ async function handleAuthUpdate(update) {
   const chatId = msg.chat.id;
 
   if (msg.text && msg.text.startsWith('/start')) {
-  const parts = msg.text.split(' ');
-  const nonce = parts.length > 1 ? parts[1] : null;
-  
-  if (!nonce) {
-    // Agar foydalanuvchi shunchaki /start bosgan bo'lsa
-    await sendTgMsg(AUTH_BOT_TOKEN, chatId, "Assalomu alaykum! Tizimga kirish uchun iltimos, saytga qaytib, Profil bo'limidan 'Mijoz' yoki 'Savdogar' tugmasini bosing. Shunda sizga maxsus kirish havolasi beriladi.");
-    return;
-  }
+    const parts = msg.text.split(' ');
+    const nonce = parts.length > 1 ? parts[1] : null;
+    
+    if (!nonce) {
+      await sendTgMsg(AUTH_BOT_TOKEN, chatId, "Assalomu alaykum! Tizimga kirish uchun iltimos, saytga qaytib, Profil bo'limidan 'Mijoz' yoki 'Savdogar' tugmasini bosing. Shunda sizga maxsus kirish havolasi beriladi.");
+      return;
+    }
 
-  const auth = DATA.authNonces[nonce];
-  if (auth && Date.now() - auth.createdAt < 10 * 60 * 1000) {
-    auth.chatId = chatId;
-    auth.status = 'waiting_contact';
-    await saveData();
-    let roleText = auth.role === 'seller' ? 'savdogar' : 'mijoz';
-    await sendTgMsg(AUTH_BOT_TOKEN, chatId, `Assalomu alaykum, hurmatli ${roleText}! SARDOR ART ga xush kelibsiz. Davom etish uchun telefon raqamingizni yuboring.`, {
-      keyboard: [[{ text: "📱 Raqamni yuborish", request_contact: true }]], resize_keyboard: true, one_time_keyboard: true
-    });
+    const auth = DATA.authNonces[nonce];
+    if (auth && Date.now() - auth.createdAt < 10 * 60 * 1000) {
+      auth.chatId = chatId;
+      auth.status = 'waiting_contact';
+      await saveData();
+      let roleText = auth.role === 'seller' ? 'savdogar' : 'mijoz';
+      await sendTgMsg(AUTH_BOT_TOKEN, chatId, `Assalomu alaykum, hurmatli ${roleText}! SARDOR ART ga xush kelibsiz. Davom etish uchun telefon raqamingizni yuboring.`, {
+        keyboard: [[{ text: "📱 Raqamni yuborish", request_contact: true }]], resize_keyboard: true, one_time_keyboard: true
+      });
+      return;
+    }
+    
+    await sendTgMsg(AUTH_BOT_TOKEN, chatId, 'Xatolik: Havola eskirgan (10 daqiqa o\'tgan). Iltimos, saytga qaytib, qaytadan urinib ko\'ring.');
     return;
   }
-  
-  await sendTgMsg(AUTH_BOT_TOKEN, chatId, 'Xatolik: Havola eskirgan (10 daqiqa o\'tgan). Iltimos, saytga qaytib, qaytadan urinib ko\'ring.');
-  return;
-}
 
   if (msg.contact) {
     let activeNonce = null;
@@ -172,97 +171,132 @@ async function pollOrderUpdates() {
 }
 
 async function handleOrderUpdate(update) {
-  if (update.callback_query) {
-    const cb = update.callback_query;
-    const chatId = cb.message.chat.id;
-    const data = cb.data;
-    await answerCallback(ORDER_BOT_TOKEN, cb.id);
+  try {
+    // Tugmalar (Callback Query) bosilganda
+    if (update.callback_query) {
+      const cb = update.callback_query;
+      const chatId = cb.message.chat.id;
+      const data = cb.data;
+      await answerCallback(ORDER_BOT_TOKEN, cb.id);
 
-    if (DATA.botStates[chatId]) {
-      const state = DATA.botStates[chatId];
+      let state = DATA.botStates[chatId];
+      if (!state) return;
 
-      if (data.startsWith('ord_genre_') && state.step === 'genre') {
-        state.data.genre = data.replace('ord_genre_', '');
+      if (data.startsWith('genre_')) {
+        state.data.genre = data.replace('genre_', '');
         state.step = 'size';
         await saveData();
-        const sizes = [
-          [{ text: "30x40 sm - 400,000 so'm", callback_data: "ord_size_400" }, { text: "40x50 sm - 600,000 so'm", callback_data: "ord_size_600" }],
-          [{ text: "50x70 sm - 900,000 so'm", callback_data: "ord_size_900" }, { text: "60x80 sm - 1,200,000 so'm", callback_data: "ord_size_1200" }],
-          [{ text: "70x100 sm - 1,800,000 so'm", callback_data: "ord_size_1800" }, { text: "100x120 sm - 2,500,000 so'm", callback_data: "ord_size_2500" }]
-        ];
-        await sendTgMsg(ORDER_BOT_TOKEN, chatId, "Ajoyib! Endi rasm o'lchamini tanlang:", { inline_keyboard: sizes });
+        await sendTgMsg(ORDER_BOT_TOKEN, chatId, "Rasm o'lchamini tanlang (sm):", {
+          inline_keyboard: [
+            [{ text: "30x40 (400,000 so'm)", callback_data: "size_400" }, { text: "40x50 (600,000 so'm)", callback_data: "size_600" }],
+            [{ text: "50x70 (900,000 so'm)", callback_data: "size_900" }, { text: "60x80 (1,200,000 so'm)", callback_data: "size_1200" }],
+            [{ text: "80x100 (1,800,000 so'm)", callback_data: "size_1800" }, { text: "100x120 (2,500,000 so'm)", callback_data: "size_2500" }]
+          ]
+        });
+        return;
       }
-      else if (data.startsWith('ord_size_') && state.step === 'size') {
-        state.data.size = data.replace('ord_size_', '');
+
+      if (data.startsWith('size_')) {
+        state.data.size = data.replace('size_', '');
         state.step = 'theme';
         await saveData();
-        const themes = [
-          [{ text: "Oila a'zolari", callback_data: "ord_theme_oila" }, { text: "Tabiat", callback_data: "ord_theme_tabiat" }],
-          [{ text: "Hayvonlar", callback_data: "ord_theme_hayvon" }, { text: "Portret", callback_data: "ord_theme_portret" }],
-          [{ text: "Fantaziya", callback_data: "ord_theme_fantaziya" }, { text: "Boshqa", callback_data: "ord_theme_boshqa" }]
-        ];
-        await sendTgMsg(ORDER_BOT_TOKEN, chatId, "Rasm nima haqida bo'lishini xohlaysiz? (Mavzuni tanlang)", { inline_keyboard: themes });
+        await sendTgMsg(ORDER_BOT_TOKEN, chatId, "Rasm mavzusi yoki g'oyasini qisqacha yozib yuboring:");
+        return;
       }
-      else if (data.startsWith('ord_theme_') && state.step === 'theme') {
-        state.data.theme = data.replace('ord_theme_', '');
+    }
+
+    // Xabar kelganda
+    if (update.message) {
+      const msg = update.message;
+      const chatId = msg.chat.id;
+
+      if (msg.text && msg.text.startsWith('/start')) {
+        DATA.botStates[chatId] = { step: 'genre', data: {} };
+        await saveData();
+        await sendTgMsg(ORDER_BOT_TOKEN, chatId, "Assalomu alaykum! Maxsus rasm buyurtma berish uchun janrni tanlang:", {
+          inline_keyboard: [
+            [{ text: "Portret", callback_data: "genre_Portret" }, { text: "Manzara", callback_data: "genre_Manzara" }],
+            [{ text: "Abstraksiya", callback_data: "genre_Abstraksiya" }, { text: "Boshqa", callback_data: "genre_Boshqa" }]
+          ]
+        });
+        return;
+      }
+
+      const state = DATA.botStates[chatId];
+      if (!state) return;
+
+      // Mavzu kiritilganda
+      if (state.step === 'theme' && msg.text) {
+        state.data.theme = msg.text;
         state.step = 'phone';
         await saveData();
-        await sendTgMsg(ORDER_BOT_TOKEN, chatId, "Rahmat! Endi telefon raqamingizni yuboring:", {
-          keyboard: [[{ text: "📱 Raqamni yuborish", request_contact: true }]], resize_keyboard: true, one_time_keyboard: true
+        await sendTgMsg(ORDER_BOT_TOKEN, chatId, "Telefon raqamingizni yuboring:", {
+          keyboard: [[{ text: "📱 Raqamni yuborish", request_contact: true }]],
+          resize_keyboard: true,
+          one_time_keyboard: true
         });
-      }
-    }
-    return;
-  }
-
-  if (!update.message) return;
-  const msg = update.message;
-  const chatId = msg.chat.id;
-
-  if (msg.text && msg.text.startsWith('/start')) {
-    DATA.botStates[chatId] = { step: 'genre', data: {} };
-    await saveData();
-    const genres = [
-      [{ text: "Portret", callback_data: "ord_genre_portret" }, { text: "Manzara", callback_data: "ord_genre_manzara" }],
-      [{ text: "Natyurmort", callback_data: "ord_genre_natyurmort" }, { text: "Abstrakt", callback_data: "ord_genre_abstrakt" }],
-      [{ text: "Animalistik", callback_data: "ord_genre_animal" }, { text: "Zamonaviy", callback_data: "ord_genre_zamonaviy" }]
-    ];
-    await sendTgMsg(ORDER_BOT_TOKEN, chatId, "Assalomu alaykum! SARDOR ART dan maxsus rasm zakaz qilmoqchisiz. Keling, boshladik!\n\n1-qadam: Rasm janrini tanlang:", { inline_keyboard: genres });
-    return;
-  }
-
-  if (DATA.botStates[chatId]) {
-    const state = DATA.botStates[chatId];
-
-    if (state.step === 'phone' && msg.contact) {
-      state.data.phone = msg.contact.phone_number;
-      state.step = 'address';
-      await saveData();
-      await sendTgMsg(ORDER_BOT_TOKEN, chatId, "Rahmat! Endi manzilingizni yuboring (Lokatsiya orqali yoki yozma ravishda):", {
-        keyboard: [[{ text: "📍 Lokatsiyani yuborish", request_location: true }]], resize_keyboard: true, one_time_keyboard: true
-      });
-      return;
-    }
-
-    if (state.step === 'address' && (msg.location || msg.text)) {
-      if (msg.location) {
-        state.data.address = `Lokatsiya: https://www.google.com/maps?q=${msg.location.latitude},${msg.location.longitude}`;
-      } else {
-        state.data.address = msg.text;
+        return;
       }
 
-      const sizePrices = { '400': '400,000', '600': '600,000', '900': '900,000', '1200': '1,200,000', '1800': '1,800,000', '2500': '2,500,000' };
-      const price = sizePrices[state.data.size] || 'Kelishilgan holda';
+      // Telefon raqam yuborilganda
+      if (state.step === 'phone' && (msg.contact || msg.text)) {
+        state.data.phone = msg.contact ? msg.contact.phone_number : msg.text;
+        state.step = 'address';
+        await saveData();
+        await sendTgMsg(ORDER_BOT_TOKEN, chatId, "Rahmat! Endi manzilingizni yuboring (Lokatsiya orqali yoki yozma ravishda):", {
+          keyboard: [[{ text: "📍 Lokatsiyani yuborish", request_location: true }]],
+          resize_keyboard: true,
+          one_time_keyboard: true
+        });
+        return;
+      }
 
-      const summary = `🎨 Yangi ZAKAZ!\n\nJanr: ${state.data.genre}\nO'lcham: ${state.data.size}\nMavzu: ${state.data.theme}\nTel: ${state.data.phone}\nManzil: ${state.data.address}`;
-      await sendTgMsg(ORDER_BOT_TOKEN, ADMIN_CHAT_ID, summary);
+      // Lokatsiya yoki Venue (Joy nomi bilan lokatsiya) kelganda
+      if (state.step === 'address' && (msg.location || msg.venue || msg.text)) {
+        let addressStr = '';
+        
+        if (msg.location) {
+          addressStr = `Lokatsiya: https://www.google.com/maps?q=${msg.location.latitude},${msg.location.longitude}`;
+        } else if (msg.venue) {
+          addressStr = `Joy: ${msg.venue.title}, ${msg.venue.address}\nLokatsiya: https://www.google.com/maps?q=${msg.venue.location.latitude},${msg.venue.location.longitude}`;
+        } else {
+          addressStr = msg.text;
+        }
+        
+        state.data.address = addressStr;
+        
+        const sizePrices = { 
+          '400': '400,000', 
+          '600': '600,000', 
+          '900': '900,000', 
+          '1200': '1,200,000', 
+          '1800': '1,800,000', 
+          '2500': '2,500,000' 
+        };
+        const price = sizePrices[state.data.size] || 'Kelishilgan holda';
+        
+        const summary = `🎨 Yangi ZAKAZ!\n\nJanr: ${state.data.genre}\nO'lcham: ${state.data.size}\nMavzu: ${state.data.theme}\nTel: ${state.data.phone}\nManzil: ${state.data.address}`;
+        
+        // Adminga yuborish
+        await sendTgMsg(ORDER_BOT_TOKEN, ADMIN_CHAT_ID, summary);
 
-      const finalMsg = `Xush kelibsiz! Ma'lumotlaringiz qabul qilindi.\n\nTaxminiy narxi: <b>${price} so'm</b>\n\nTez orada aloqaga chiqamiz. Minnatdorchilik bildiramiz!\n\nBizning ijtimoiy tarmoqlar:\nTelegram: https://t.me/sardor_artest_uz\nInstagram: https://www.instagram.com/sardor_art_painter`;
-
-      await sendTgMsg(ORDER_BOT_TOKEN, chatId, finalMsg, { inline_keyboard: [[{ text: "Saytga qaytish", url: SITE_URL }]] });
-      delete DATA.botStates[chatId];
-      await saveData();
-      return;
+        // Foydalanuvchiga rahmat aytish
+        const finalMsg = `Xush kelibsiz! Ma'lumotlaringiz qabul qilindi.\n\nTaxminiy narxi: <b>${price} so'm</b>\n\nTez orada aloqaga chiqamiz. Minnatdorchilik bildiramiz!\n\nBizning ijtimoiy tarmoqlar:\nTelegram: https://t.me/sardor_artest_uz\nInstagram: https://www.instagram.com/sardor_art_painter`;
+        
+        await sendTgMsg(ORDER_BOT_TOKEN, chatId, finalMsg, { 
+          inline_keyboard: [[{ text: "Saytga qaytish", url: SITE_URL }]] 
+        });
+        
+        delete DATA.botStates[chatId];
+        await saveData();
+        return;
+      }
+    }
+  } catch (err) {
+    console.error('Order bot xatosi:', err);
+    const chatId = typeof update !== 'undefined' ? update?.message?.chat?.id : null;
+    if (chatId) {
+      await sendTgMsg(ORDER_BOT_TOKEN, chatId, "Kechirasiz, tizimda xatolik yuz berdi. Iltimos, /start bosib qaytadan urinib ko'ring.");
     }
   }
 }
