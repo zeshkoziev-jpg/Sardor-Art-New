@@ -23,7 +23,7 @@ const AUTH_BOT_USERNAME = process.env.AUTH_BOT_USERNAME || 'SardorArt_Bot';
 const ORDER_BOT_TOKEN = process.env.ORDER_BOT_TOKEN;
 const ORDER_BOT_USERNAME = process.env.ORDER_BOT_USERNAME || 'SardorOrderBot';
 const SITE_URL = process.env.SITE_URL || `http://localhost:${PORT}`;
-const ADMIN_CHAT_ID = '8631399966';
+const ADMIN_CHAT_ID = '8857301370';
 
 const DATA_FILE = path.join(__dirname, 'data.json');
 let DATA = { users: {}, sessions: {}, authNonces: {}, products: [], orders: [], botStates: {} };
