@@ -99,25 +99,30 @@ async function handleAuthUpdate(update) {
   const chatId = msg.chat.id;
 
   if (msg.text && msg.text.startsWith('/start')) {
-    const parts = msg.text.split(' ');
-    const nonce = parts.length > 1 ? parts[1] : null;
-
-    if (nonce) {
-      const auth = DATA.authNonces[nonce];
-      if (auth && Date.now() - auth.createdAt < 10 * 60 * 1000) {
-        auth.chatId = chatId;
-        auth.status = 'waiting_contact';
-        await saveData();
-        let roleText = auth.role === 'seller' ? 'savdogar' : 'mijoz';
-        await sendTgMsg(AUTH_BOT_TOKEN, chatId, `Assalomu alaykum, hurmatli ${roleText}! SARDOR ART ga xush kelibsiz. Davom etish uchun telefon raqamingizni yuboring.`, {
-          keyboard: [[{ text: "📱 Raqamni yuborish", request_contact: true }]], resize_keyboard: true, one_time_keyboard: true
-        });
-        return;
-      }
-    }
-    await sendTgMsg(AUTH_BOT_TOKEN, chatId, 'Xatolik: Havola eskirgan. Iltimos, saytga qaytib, qaytadan urinib ko\'ring.');
+  const parts = msg.text.split(' ');
+  const nonce = parts.length > 1 ? parts[1] : null;
+  
+  if (!nonce) {
+    // Agar foydalanuvchi shunchaki /start bosgan bo'lsa
+    await sendTgMsg(AUTH_BOT_TOKEN, chatId, "Assalomu alaykum! Tizimga kirish uchun iltimos, saytga qaytib, Profil bo'limidan 'Mijoz' yoki 'Savdogar' tugmasini bosing. Shunda sizga maxsus kirish havolasi beriladi.");
     return;
   }
+
+  const auth = DATA.authNonces[nonce];
+  if (auth && Date.now() - auth.createdAt < 10 * 60 * 1000) {
+    auth.chatId = chatId;
+    auth.status = 'waiting_contact';
+    await saveData();
+    let roleText = auth.role === 'seller' ? 'savdogar' : 'mijoz';
+    await sendTgMsg(AUTH_BOT_TOKEN, chatId, `Assalomu alaykum, hurmatli ${roleText}! SARDOR ART ga xush kelibsiz. Davom etish uchun telefon raqamingizni yuboring.`, {
+      keyboard: [[{ text: "📱 Raqamni yuborish", request_contact: true }]], resize_keyboard: true, one_time_keyboard: true
+    });
+    return;
+  }
+  
+  await sendTgMsg(AUTH_BOT_TOKEN, chatId, 'Xatolik: Havola eskirgan (10 daqiqa o\'tgan). Iltimos, saytga qaytib, qaytadan urinib ko\'ring.');
+  return;
+}
 
   if (msg.contact) {
     let activeNonce = null;
