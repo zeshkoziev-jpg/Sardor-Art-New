@@ -18,8 +18,8 @@ if (fs.existsSync('.env')) {
 }
 
 const PORT = process.env.PORT || 3000;
-const AUTH_BOT_TOKEN = process.env.AUTH_BOT_TOKEN;
-const AUTH_BOT_USERNAME = process.env.AUTH_BOT_USERNAME || 'SardorArtBot';
+const AUTH_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const AUTH_BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME || 'SardorArtBot';
 const ORDER_BOT_TOKEN = process.env.ORDER_BOT_TOKEN;
 const ORDER_BOT_USERNAME = process.env.ORDER_BOT_USERNAME || 'SardorOrderBot';
 const SITE_URL = process.env.SITE_URL || `http://localhost:${PORT}`;
@@ -73,9 +73,7 @@ async function answerCallback(token, callbackQueryId) {
   } catch (err) { console.error('Callback error:', err.message); }
 }
 
-// ==========================================
-// 1. RO'YXATDAN O'TISH BOTI (Auth)
-// ==========================================
+// 1. RO'YXATDAN O'TISH BOTI
 async function pollAuthUpdates() {
   if (!AUTH_BOT_TOKEN) return console.log('AUTH_BOT_TOKEN berilmagan.');
   let offset = 0;
@@ -100,20 +98,24 @@ async function handleAuthUpdate(update) {
   const msg = update.message;
   const chatId = msg.chat.id;
 
-  if (msg.text && msg.text.startsWith('/start ')) {
-    const nonce = msg.text.split(' ')[1];
-    const auth = DATA.authNonces[nonce];
-    if (auth && Date.now() - auth.createdAt < 10 * 60 * 1000) {
-      auth.chatId = chatId;
-      auth.status = 'waiting_contact';
-      await saveData();
-      let roleText = auth.role === 'seller' ? 'savdogar' : 'mijoz';
-      await sendTgMsg(AUTH_BOT_TOKEN, chatId, `Assalomu alaykum, hurmatli ${roleText}! SARDOR ART ga xush kelibsiz. Davom etish uchun telefon raqamingizni yuboring.`, {
-        keyboard: [[{ text: "📱 Raqamni yuborish", request_contact: true }]], resize_keyboard: true, one_time_keyboard: true
-      });
-    } else {
-      await sendTgMsg(AUTH_BOT_TOKEN, chatId, 'Xatolik: Havola eskirgan.');
+  if (msg.text && msg.text.startsWith('/start')) {
+    const parts = msg.text.split(' ');
+    const nonce = parts.length > 1 ? parts[1] : null;
+
+    if (nonce) {
+      const auth = DATA.authNonces[nonce];
+      if (auth && Date.now() - auth.createdAt < 10 * 60 * 1000) {
+        auth.chatId = chatId;
+        auth.status = 'waiting_contact';
+        await saveData();
+        let roleText = auth.role === 'seller' ? 'savdogar' : 'mijoz';
+        await sendTgMsg(AUTH_BOT_TOKEN, chatId, `Assalomu alaykum, hurmatli ${roleText}! SARDOR ART ga xush kelibsiz. Davom etish uchun telefon raqamingizni yuboring.`, {
+          keyboard: [[{ text: "📱 Raqamni yuborish", request_contact: true }]], resize_keyboard: true, one_time_keyboard: true
+        });
+        return;
+      }
     }
+    await sendTgMsg(AUTH_BOT_TOKEN, chatId, 'Xatolik: Havola eskirgan. Iltimos, saytga qaytib, qaytadan urinib ko\'ring.');
     return;
   }
 
@@ -122,25 +124,29 @@ async function handleAuthUpdate(update) {
     for (const [nonce, auth] of Object.entries(DATA.authNonces)) {
       if (auth.chatId === chatId && auth.status === 'waiting_contact') { activeNonce = nonce; break; }
     }
+
     if (activeNonce) {
       const auth = DATA.authNonces[activeNonce];
       if (msg.contact.user_id !== msg.from.id) return sendTgMsg(AUTH_BOT_TOKEN, chatId, 'Faqat o\'z raqamingizni yuboring.');
+
       let phone = msg.contact.phone_number;
       if (!phone.startsWith('+')) phone = '+' + phone;
       if (!/^\+998\d{9}$/.test(phone)) return sendTgMsg(AUTH_BOT_TOKEN, chatId, 'Format noto\'g\'ri (+998XXXXXXXXX).');
-      
+
       const code = String(crypto.randomInt(100000, 999999));
-      auth.phone = phone; auth.codeHash = crypto.createHash('sha256').update(code).digest('hex');
-      auth.status = 'waiting_code'; auth.attempts = 0; auth.sentAt = Date.now();
+      auth.phone = phone;
+      auth.codeHash = crypto.createHash('sha256').update(code).digest('hex');
+      auth.status = 'waiting_code';
+      auth.attempts = 0;
+      auth.sentAt = Date.now();
+
       await saveData();
-      await sendTgMsg(AUTH_BOT_TOKEN, chatId, `Tasdiqlash kodi:\n\n<code>${code}</code>`, { remove_keyboard: true });
+      await sendTgMsg(AUTH_BOT_TOKEN, chatId, `Rahmat! Saytga qaytib ushbu kodni kiriting:\n\n<code>${code}</code>`, { remove_keyboard: true });
     }
   }
 }
 
-// ==========================================
-// 2. ZAKAZ BERISH BOTI (Order)
-// ==========================================
+// 2. ZAKAZ BERISH BOTI
 async function pollOrderUpdates() {
   if (!ORDER_BOT_TOKEN) return console.log('ORDER_BOT_TOKEN berilmagan.');
   let offset = 0;
@@ -166,7 +172,7 @@ async function handleOrderUpdate(update) {
     const chatId = cb.message.chat.id;
     const data = cb.data;
     await answerCallback(ORDER_BOT_TOKEN, cb.id);
-    
+
     if (DATA.botStates[chatId]) {
       const state = DATA.botStates[chatId];
 
@@ -222,7 +228,7 @@ async function handleOrderUpdate(update) {
 
   if (DATA.botStates[chatId]) {
     const state = DATA.botStates[chatId];
-    
+
     if (state.step === 'phone' && msg.contact) {
       state.data.phone = msg.contact.phone_number;
       state.step = 'address';
@@ -239,15 +245,15 @@ async function handleOrderUpdate(update) {
       } else {
         state.data.address = msg.text;
       }
-      
+
       const sizePrices = { '400': '400,000', '600': '600,000', '900': '900,000', '1200': '1,200,000', '1800': '1,800,000', '2500': '2,500,000' };
       const price = sizePrices[state.data.size] || 'Kelishilgan holda';
-      
+
       const summary = `🎨 Yangi ZAKAZ!\n\nJanr: ${state.data.genre}\nO'lcham: ${state.data.size}\nMavzu: ${state.data.theme}\nTel: ${state.data.phone}\nManzil: ${state.data.address}`;
       await sendTgMsg(ORDER_BOT_TOKEN, ADMIN_CHAT_ID, summary);
 
       const finalMsg = `Xush kelibsiz! Ma'lumotlaringiz qabul qilindi.\n\nTaxminiy narxi: <b>${price} so'm</b>\n\nTez orada aloqaga chiqamiz. Minnatdorchilik bildiramiz!\n\nBizning ijtimoiy tarmoqlar:\nTelegram: https://t.me/sardor_artest_uz\nInstagram: https://www.instagram.com/sardor_art_painter`;
-      
+
       await sendTgMsg(ORDER_BOT_TOKEN, chatId, finalMsg, { inline_keyboard: [[{ text: "Saytga qaytish", url: SITE_URL }]] });
       delete DATA.botStates[chatId];
       await saveData();
@@ -256,9 +262,7 @@ async function handleOrderUpdate(update) {
   }
 }
 
-// ==========================================
 // EXPRESS SERVER VA API
-// ==========================================
 const app = express();
 app.disable('x-powered-by');
 app.use(express.json({ limit: '3mb' }));
@@ -296,13 +300,15 @@ function auth(required = true) {
 app.post('/api/auth/start', rateLimit(10), async (req, res) => {
   try {
     const { role } = req.body || {};
+    if (role !== 'customer' && role !== 'seller') {
+      return res.status(400).json({ error: 'Rol noto\'g\'ri' });
+    }
     const nonce = crypto.randomBytes(16).toString('hex');
     DATA.authNonces[nonce] = { role, createdAt: Date.now(), status: 'pending' };
     await saveData();
-    res.json({ nonce, url: `https://t.me/${AUTH_BOT_USERNAME}?start=${nonce} `});
+    res.json({ nonce, url: `https://t.me/${AUTH_BOT_USERNAME}?start=${nonce}` });
   } catch (err) {
-    console.error('Auth start xatosi:', err);
-    res.status(500).json({ error: 'Serverda xatolik yuz berdi. Iltimos keyinroq urinib ko\'ring.' });
+    res.status(500).json({ error: 'Serverda xatolik yuz berdi.' });
   }
 });
 
@@ -313,44 +319,30 @@ app.get('/api/auth/status', (req, res) => {
 
 app.post('/api/auth/verify', rateLimit(10), async (req, res) => {
   try {
-    const { nonce, code } = req.body;
+    const { nonce, code } = req.body || {};
     const auth = DATA.authNonces[nonce];
     if (!auth || Date.now() - auth.createdAt > 600000) return res.status(400).json({ error: 'Kod muddati o\'tgan' });
-    
     const hash = crypto.createHash('sha256').update(String(code)).digest('hex');
-    if (hash !== auth.codeHash) return res.status(400).json({ error: 'Kod xato' });
-    
+    if (hash !== auth.codeHash) {
+      auth.attempts = (auth.attempts || 0) + 1;
+      if (auth.attempts >= 5) delete DATA.authNonces[nonce];
+      await saveData();
+      return res.status(400).json({ error: 'Kod xato' });
+    }
+
     const token = crypto.randomBytes(32).toString('hex');
     DATA.sessions[token] = { phone: auth.phone, role: auth.role, createdAt: Date.now() };
     DATA.users[auth.phone] = { ...DATA.users[auth.phone], phone: auth.phone, role: auth.role, telegramId: auth.chatId };
-    
-    delete DATA.authNonces[nonce]; 
+    delete DATA.authNonces[nonce];
     await saveData();
-    
-    sendTgMsg(AUTH_BOT_TOKEN, auth.chatId,` ✅ Muvaffaqiyatli ro'yxatdan o'tdingiz!`, { inline_keyboard: [[{ text: "🌐 Saytga qaytish", url: SITE_URL }]] });
+
+    sendTgMsg(AUTH_BOT_TOKEN, auth.chatId, `✅ Muvaffaqiyatli ro'yxatdan o'tdingiz!`, { inline_keyboard: [[{ text: "🌐 Saytga qaytish", url: SITE_URL }]] });
     res.json({ token });
   } catch (err) {
-    console.error('Auth verify xatosi:', err);
     res.status(500).json({ error: 'Serverda xatolik yuz berdi.' });
   }
 });
-app.get('/api/auth/status', (req, res) => {
-  const auth = DATA.authNonces[req.query.nonce];
-  res.json({ status: auth ? auth.status : 'not_found' });
-});
-app.post('/api/auth/verify', rateLimit(10), async (req, res) => {
-  const { nonce, code } = req.body;
-  const auth = DATA.authNonces[nonce];
-  if (!auth || Date.now() - auth.createdAt > 600000) return res.status(400).json({ error: 'Xato' });
-  const hash = crypto.createHash('sha256').update(String(code)).digest('hex');
-  if (hash !== auth.codeHash) return res.status(400).json({ error: 'Kod xato' });
-  const token = crypto.randomBytes(32).toString('hex');
-  DATA.sessions[token] = { phone: auth.phone, role: auth.role, createdAt: Date.now() };
-  DATA.users[auth.phone] = { ...DATA.users[auth.phone], phone: auth.phone, role: auth.role, telegramId: auth.chatId };
-  delete DATA.authNonces[nonce]; await saveData();
-  sendTgMsg(AUTH_BOT_TOKEN, auth.chatId, `✅ Muvaffaqiyatli ro'yxatdan o'tdingiz!`, { inline_keyboard: [[{ text: "🌐 Saytga qaytish", url: SITE_URL }]] });
-  res.json({ token });
-});
+
 app.get('/api/me', auth(), (req, res) => res.json({ user: { phone: req.user.phone, role: req.user.role } }));
 
 app.get('/api/products', (req, res) => {
@@ -364,57 +356,70 @@ app.get('/api/products', (req, res) => {
     return { id: p.id, name: p.name, price: finalPrice, originalPrice: p.price, discount: d, genre: p.genre, paymentType: p.paymentType, image: p.image };
   })});
 });
+
 app.get('/api/products/:id', (req, res) => {
   const p = DATA.products.find(x => x.id === req.params.id && x.status === 'available');
   if (!p) return res.status(404).json({ error: 'Topilmadi' });
   const d = p.discount || 0; const finalPrice = d > 0 ? Math.round(p.price * (1 - d / 100)) : p.price;
   res.json({ product: { id: p.id, name: p.name, price: finalPrice, originalPrice: p.price, discount: d, genre: p.genre, paymentType: p.paymentType, image: p.image, description: p.description || '' } });
 });
+
 app.get('/api/seller/products', auth(), (req, res) => {
   if (req.user.role !== 'seller') return res.status(403).json({ error: 'Ruxsat yo\'q' });
   res.json({ products: DATA.products.filter(p => p.sellerPhone === req.user.phone) });
 });
+
 app.post('/api/seller/products', auth(), rateLimit(20), async (req, res) => {
   if (req.user.role !== 'seller') return res.status(403).json({ error: 'Ruxsat yo\'q' });
-  const { name, price, genre, paymentType, image, description, discount } = req.body;
+  const { name, price, genre, paymentType, image, description, discount } = req.body || {};
   const disc = Number(discount) || 0;
   if (!name || !price || !image) return res.status(400).json({ error: 'Ma\'lumotlar to\'liq emas' });
   const id = crypto.randomBytes(8).toString('hex');
-  const product = { id, name, price, genre, paymentType, image, description: description || '', discount: disc, sellerPhone: req.user.phone, status: 'available', createdAt: Date.now() };
+  const product = { id, name, price: Number(price), genre, paymentType, image, description: description || '', discount: disc, sellerPhone: req.user.phone, status: 'available', createdAt: Date.now() };
   DATA.products.push(product); await saveData(); res.json({ product });
 });
+
 app.delete('/api/seller/products/:id', auth(), async (req, res) => {
   if (req.user.role !== 'seller') return res.status(403).json({ error: 'Ruxsat yo\'q' });
   const idx = DATA.products.findIndex(p => p.id === req.params.id && p.sellerPhone === req.user.phone);
   if (idx !== -1) DATA.products.splice(idx, 1);
   await saveData(); res.json({ ok: true });
 });
+
 app.get('/api/seller/sold', auth(), (req, res) => {
   if (req.user.role !== 'seller') return res.status(403).json({ error: 'Ruxsat yo\'q' });
   res.json({ orders: DATA.orders.filter(o => o.sellerPhone === req.user.phone).sort((a, b) => b.createdAt - a.createdAt) });
 });
+
 app.post('/api/orders', auth(), rateLimit(10), async (req, res) => {
   if (req.user.role !== 'customer') return res.status(403).json({ error: 'Ruxsat yo\'q' });
-  const { items, buyerName, buyerPhone, lat, lng } = req.body;
-  const createdOrders = [];
+  const { items, buyerName, buyerPhone, lat, lng } = req.body || {};
+  if (!Array.isArray(items) || !items.length) return res.status(400).json({ error: 'Savat bo\'sh' });
+
+  const matchedProducts = [];
   for (const item of items) {
     const p = DATA.products.find(x => x.id === item.id);
-    if (!p || p.status !== 'available') return res.status(400).json({ error: `Asar topilmadi: ${item.name}` });
+    if (!p || p.status !== 'available') return res.status(400).json({ error: `Asar topilmadi: ${item.name || ''}` });
+    matchedProducts.push(p);
+  }
+
+  const createdOrders = [];
+  for (const p of matchedProducts) {
     const d = p.discount || 0; const finalPrice = d > 0 ? Math.round(p.price * (1 - d / 100)) : p.price;
     p.status = 'sold';
     const order = { id: crypto.randomBytes(8).toString('hex'), productId: p.id, productName: p.name, price: finalPrice, paymentType: p.paymentType, buyerName, buyerPhone, lat, lng, sellerPhone: p.sellerPhone, createdAt: Date.now() };
     DATA.orders.push(order); createdOrders.push(order);
     const seller = DATA.users[p.sellerPhone];
-    if (seller && seller.telegramId) sendTgMsg(AUTH_BOT_TOKEN, seller.telegramId, `🎉 Asar sotildi!\n\nSurat nomi:${p.name}\nMijoz: ${buyerName}\nTelfon: ${buyerPhone}\n\n Mijoz bilan 24 soat ichida bog'laning iltimot.`);
+    if (seller && seller.telegramId) sendTgMsg(AUTH_BOT_TOKEN, seller.telegramId, `🎉 Asar sotildi!\n${p.name}\nMijoz: ${buyerName}`);
   }
   await saveData(); res.json({ ok: true, orders: createdOrders });
 });
 
 (async () => {
   await loadData();
-  app.listen(PORT, () => { 
-    console.log(`Server: http://localhost:${PORT}`); 
-    pollAuthUpdates(); 
-    pollOrderUpdates(); 
+  app.listen(PORT, () => {
+    console.log(`Server: http://localhost:${PORT}`);
+    pollAuthUpdates();
+    pollOrderUpdates();
   });
 })();
