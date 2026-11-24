@@ -4,6 +4,7 @@ const express = require('express');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const { MongoClient } = require('mongodb');
 
 if (fs.existsSync('.env')) {
   const envConfig = fs.readFileSync('.env', 'utf8');
@@ -18,39 +19,39 @@ if (fs.existsSync('.env')) {
 }
 
 const PORT = process.env.PORT || 3000;
-const AUTH_BOT_TOKEN = process.env.AUTH_BOT_TOKEN;
-const AUTH_BOT_USERNAME = process.env.AUTH_BOT_USERNAME || 'SardorArt_Bot';
+const AUTH_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const AUTH_BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME || 'SardorArtBot';
 const ORDER_BOT_TOKEN = process.env.ORDER_BOT_TOKEN;
 const ORDER_BOT_USERNAME = process.env.ORDER_BOT_USERNAME || 'SardorOrderBot';
 const SITE_URL = process.env.SITE_URL || `http://localhost:${PORT}`;
 const ADMIN_CHAT_ID = '8631399966';
+const MONGODB_URI = process.env.MONGODB_URI;
 
-const DATA_FILE = path.join(__dirname, 'data.json');
-let DATA = { users: {}, sessions: {}, authNonces: {}, products: [], orders: [], botStates: {} };
-let writeQueue = Promise.resolve();
+let db, usersCol, sessionsCol, authNoncesCol, productsCol, ordersCol, botStatesCol;
 
-async function saveData() {
-  writeQueue = writeQueue.then(async () => {
-    const tmp = DATA_FILE + '.tmp';
-    await fs.promises.writeFile(tmp, JSON.stringify(DATA, null, 2));
-    await fs.promises.rename(tmp, DATA_FILE);
-  }).catch(console.error);
-  return writeQueue;
+// Foydalanuvchi matnidagi < > & belgilarini HTML xatolik bermasligi uchun tozalash
+function escapeHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
-async function loadData() {
-  try {
-    const raw = await fs.promises.readFile(DATA_FILE, 'utf8');
-    DATA = JSON.parse(raw);
-    if (!DATA.users) DATA.users = {};
-    if (!DATA.sessions) DATA.sessions = {};
-    if (!DATA.authNonces) DATA.authNonces = {};
-    if (!DATA.products) DATA.products = [];
-    if (!DATA.orders) DATA.orders = [];
-    if (!DATA.botStates) DATA.botStates = {};
-  } catch (e) {
-    await saveData();
+async function connectDB() {
+  if (!MONGODB_URI) {
+    console.error("XATO: MONGODB_URI berilmagan! Server to'xtatildi.");
+    process.exit(1);
   }
+  const client = new MongoClient(MONGODB_URI);
+  await client.connect();
+  db = client.db('sardorart');
+  usersCol = db.collection('users');
+  sessionsCol = db.collection('sessions');
+  authNoncesCol = db.collection('authNonces');
+  productsCol = db.collection('products');
+  ordersCol = db.collection('orders');
+  botStatesCol = db.collection('botStates');
+  console.log("MongoDB ga ulandi!");
 }
 
 async function sendTgMsg(token, chatId, text, replyMarkup = null) {
@@ -59,21 +60,31 @@ async function sendTgMsg(token, chatId, text, replyMarkup = null) {
   if (replyMarkup) body.reply_markup = replyMarkup;
   try {
     await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
     });
-  } catch (err) { console.error('Telegram error:', err.message); }
+  } catch (err) {
+    console.error('Telegram error:', err.message);
+  }
 }
 
 async function answerCallback(token, callbackQueryId) {
   if (!token) return;
   try {
     await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ callback_query_id: callbackQueryId })
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ callback_query_id: callbackQueryId })
     });
-  } catch (err) { console.error('Callback error:', err.message); }
+  } catch (err) {
+    console.error('Callback error:', err.message);
+  }
 }
 
-// 1. RO'YXATDAN O'TISH BOTI
+// ==========================================
+// 1. RO'YXATDAN O'TISH BOTI (Auth)
+// ==========================================
 async function pollAuthUpdates() {
   if (!AUTH_BOT_TOKEN) return console.log('AUTH_BOT_TOKEN berilmagan.');
   let offset = 0;
@@ -94,63 +105,73 @@ async function pollAuthUpdates() {
 }
 
 async function handleAuthUpdate(update) {
-  if (!update.message) return;
-  const msg = update.message;
-  const chatId = msg.chat.id;
+  try {
+    if (!update.message) return;
+    const msg = update.message;
+    const chatId = msg.chat.id;
 
-  if (msg.text && msg.text.startsWith('/start')) {
-    const parts = msg.text.split(' ');
-    const nonce = parts.length > 1 ? parts[1] : null;
-    
-    if (!nonce) {
-      await sendTgMsg(AUTH_BOT_TOKEN, chatId, "Assalomu alaykum! Tizimga kirish uchun iltimos, saytga qaytib, Profil bo'limidan 'Mijoz' yoki 'Savdogar' tugmasini bosing. Shunda sizga maxsus kirish havolasi beriladi.");
+    if (msg.text && msg.text.startsWith('/start')) {
+      const parts = msg.text.split(' ');
+      const nonce = parts.length > 1 ? parts[1] : null;
+      
+      if (nonce) {
+        const auth = await authNoncesCol.findOne({ nonce });
+        if (auth && Date.now() - auth.createdAt < 10 * 60 * 1000) {
+          await authNoncesCol.updateOne({ nonce }, { $set: { chatId, status: 'waiting_contact' } });
+          let roleText = auth.role === 'seller' ? 'savdogar' : 'mijoz';
+          await sendTgMsg(
+            AUTH_BOT_TOKEN,
+            chatId,
+            `Assalomu alaykum, hurmatli ${roleText}! SARDOR ART ga xush kelibsiz. Davom etish uchun telefon raqamingizni yuboring.`,
+            {
+              keyboard: [[{ text: "📱 Raqamni yuborish", request_contact: true }]],
+              resize_keyboard: true,
+              one_time_keyboard: true
+            }
+          );
+          return;
+        }
+      }
+      await sendTgMsg(AUTH_BOT_TOKEN, chatId, 'Xatolik: Havola eskirgan.');
       return;
     }
 
-    const auth = DATA.authNonces[nonce];
-    if (auth && Date.now() - auth.createdAt < 10 * 60 * 1000) {
-      auth.chatId = chatId;
-      auth.status = 'waiting_contact';
-      await saveData();
-      let roleText = auth.role === 'seller' ? 'savdogar' : 'mijoz';
-      await sendTgMsg(AUTH_BOT_TOKEN, chatId, `Assalomu alaykum, hurmatli ${roleText}! SARDOR ART ga xush kelibsiz. Davom etish uchun telefon raqamingizni yuboring.`, {
-        keyboard: [[{ text: "📱 Raqamni yuborish", request_contact: true }]], resize_keyboard: true, one_time_keyboard: true
-      });
-      return;
+    if (msg.contact) {
+      const auth = await authNoncesCol.findOne({ chatId, status: 'waiting_contact' });
+      if (auth) {
+        if (msg.contact.user_id !== msg.from.id) {
+          return sendTgMsg(AUTH_BOT_TOKEN, chatId, "Faqat o'z raqamingizni yuboring.");
+        }
+        let phone = msg.contact.phone_number;
+        if (!phone.startsWith('+')) phone = '+' + phone;
+        if (!/^\+998\d{9}$/.test(phone)) {
+          return sendTgMsg(AUTH_BOT_TOKEN, chatId, "Format noto'g'ri (+998XXXXXXXXX).");
+        }
+        
+        const code = String(crypto.randomInt(100000, 999999));
+        const codeHash = crypto.createHash('sha256').update(code).digest('hex');
+        
+        await authNoncesCol.updateOne(
+          { nonce: auth.nonce }, 
+          { $set: { phone, codeHash, status: 'waiting_code', attempts: 0, sentAt: Date.now() } }
+        );
+        
+        await sendTgMsg(
+          AUTH_BOT_TOKEN,
+          chatId,
+          `Rahmat! Saytga qaytib ushbu kodni kiriting:\n\n<code>${code}</code>`,
+          { remove_keyboard: true }
+        );
+      }
     }
-    
-    await sendTgMsg(AUTH_BOT_TOKEN, chatId, 'Xatolik: Havola eskirgan (10 daqiqa o\'tgan). Iltimos, saytga qaytib, qaytadan urinib ko\'ring.');
-    return;
-  }
-
-  if (msg.contact) {
-    let activeNonce = null;
-    for (const [nonce, auth] of Object.entries(DATA.authNonces)) {
-      if (auth.chatId === chatId && auth.status === 'waiting_contact') { activeNonce = nonce; break; }
-    }
-
-    if (activeNonce) {
-      const auth = DATA.authNonces[activeNonce];
-      if (msg.contact.user_id !== msg.from.id) return sendTgMsg(AUTH_BOT_TOKEN, chatId, 'Faqat o\'z raqamingizni yuboring.');
-
-      let phone = msg.contact.phone_number;
-      if (!phone.startsWith('+')) phone = '+' + phone;
-      if (!/^\+998\d{9}$/.test(phone)) return sendTgMsg(AUTH_BOT_TOKEN, chatId, 'Format noto\'g\'ri (+998XXXXXXXXX).');
-
-      const code = String(crypto.randomInt(100000, 999999));
-      auth.phone = phone;
-      auth.codeHash = crypto.createHash('sha256').update(code).digest('hex');
-      auth.status = 'waiting_code';
-      auth.attempts = 0;
-      auth.sentAt = Date.now();
-
-      await saveData();
-      await sendTgMsg(AUTH_BOT_TOKEN, chatId, `Rahmat! Saytga qaytib ushbu kodni kiriting:\n\n<code>${code}</code>`, { remove_keyboard: true });
-    }
+  } catch (err) {
+    console.error('Auth bot xatosi:', err);
   }
 }
 
-// 2. ZAKAZ BERISH BOTI
+// ==========================================
+// 2. ZAKAZ BERISH BOTI (Order)
+// ==========================================
 async function pollOrderUpdates() {
   if (!ORDER_BOT_TOKEN) return console.log('ORDER_BOT_TOKEN berilmagan.');
   let offset = 0;
@@ -172,77 +193,69 @@ async function pollOrderUpdates() {
 
 async function handleOrderUpdate(update) {
   try {
-    // Tugmalar (Callback Query) bosilganda
     if (update.callback_query) {
       const cb = update.callback_query;
       const chatId = cb.message.chat.id;
       const data = cb.data;
       await answerCallback(ORDER_BOT_TOKEN, cb.id);
-
-      let state = DATA.botStates[chatId];
-      if (!state) return;
-
-      if (data.startsWith('genre_')) {
-        state.data.genre = data.replace('genre_', '');
-        state.step = 'size';
-        await saveData();
-        await sendTgMsg(ORDER_BOT_TOKEN, chatId, "Rasm o'lchamini tanlang (sm):", {
-          inline_keyboard: [
-            [{ text: "30x40 (400,000 so'm)", callback_data: "size_400" }, { text: "40x50 (600,000 so'm)", callback_data: "size_600" }],
-            [{ text: "50x70 (900,000 so'm)", callback_data: "size_900" }, { text: "60x80 (1,200,000 so'm)", callback_data: "size_1200" }],
-            [{ text: "80x100 (1,800,000 so'm)", callback_data: "size_1800" }, { text: "100x120 (2,500,000 so'm)", callback_data: "size_2500" }]
-          ]
-        });
-        return;
+      
+      const stateDoc = await botStatesCol.findOne({ chatId });
+      if (stateDoc) {
+        if (data.startsWith('ord_genre_') && stateDoc.step === 'genre') {
+          await botStatesCol.updateOne({ chatId }, { $set: { step: 'size', 'data.genre': data.replace('ord_genre_', '') } });
+          const sizes = [
+            [{ text: "30x40 sm - 400,000 so'm", callback_data: "ord_size_400" }, { text: "40x50 sm - 600,000 so'm", callback_data: "ord_size_600" }],
+            [{ text: "50x70 sm - 900,000 so'm", callback_data: "ord_size_900" }, { text: "60x80 sm - 1,200,000 so'm", callback_data: "ord_size_1200" }],
+            [{ text: "70x100 sm - 1,800,000 so'm", callback_data: "ord_size_1800" }, { text: "100x120 sm - 2,500,000 so'm", callback_data: "ord_size_2500" }]
+          ];
+          await sendTgMsg(ORDER_BOT_TOKEN, chatId, "Ajoyib! Endi rasm o'lchamini tanlang:", { inline_keyboard: sizes });
+        }
+        else if (data.startsWith('ord_size_') && stateDoc.step === 'size') {
+          await botStatesCol.updateOne({ chatId }, { $set: { step: 'theme', 'data.size': data.replace('ord_size_', '') } });
+          const themes = [
+            [{ text: "Oila a'zolari", callback_data: "ord_theme_oila" }, { text: "Tabiat", callback_data: "ord_theme_tabiat" }],
+            [{ text: "Hayvonlar", callback_data: "ord_theme_hayvon" }, { text: "Portret", callback_data: "ord_theme_portret" }],
+            [{ text: "Fantaziya", callback_data: "ord_theme_fantaziya" }, { text: "Boshqa", callback_data: "ord_theme_boshqa" }]
+          ];
+          await sendTgMsg(ORDER_BOT_TOKEN, chatId, "Rasm nima haqida bo'lishini xohlaysiz? (Mavzuni tanlang)", { inline_keyboard: themes });
+        }
+        else if (data.startsWith('ord_theme_') && stateDoc.step === 'theme') {
+          await botStatesCol.updateOne({ chatId }, { $set: { step: 'phone', 'data.theme': data.replace('ord_theme_', '') } });
+          await sendTgMsg(ORDER_BOT_TOKEN, chatId, "Rahmat! Endi telefon raqamingizni yuboring:", {
+            keyboard: [[{ text: "📱 Raqamni yuborish", request_contact: true }]],
+            resize_keyboard: true,
+            one_time_keyboard: true
+          });
+        }
       }
-
-      if (data.startsWith('size_')) {
-        state.data.size = data.replace('size_', '');
-        state.step = 'theme';
-        await saveData();
-        await sendTgMsg(ORDER_BOT_TOKEN, chatId, "Rasm mavzusi yoki g'oyasini qisqacha yozib yuboring:");
-        return;
-      }
+      return;
     }
 
-    // Xabar kelganda
-    if (update.message) {
-      const msg = update.message;
-      const chatId = msg.chat.id;
+    if (!update.message) return;
+    const msg = update.message;
+    const chatId = msg.chat.id;
 
-      if (msg.text && msg.text.startsWith('/start')) {
-        DATA.botStates[chatId] = { step: 'genre', data: {} };
-        await saveData();
-        await sendTgMsg(ORDER_BOT_TOKEN, chatId, "Assalomu alaykum! Maxsus rasm buyurtma berish uchun janrni tanlang:", {
-          inline_keyboard: [
-            [{ text: "Portret", callback_data: "genre_Portret" }, { text: "Manzara", callback_data: "genre_Manzara" }],
-            [{ text: "Abstraksiya", callback_data: "genre_Abstraksiya" }, { text: "Boshqa", callback_data: "genre_Boshqa" }]
-          ]
-        });
-        return;
-      }
+    if (msg.text && msg.text.startsWith('/start')) {
+      await botStatesCol.updateOne({ chatId }, { $set: { step: 'genre', data: {} } }, { upsert: true });
+      const genres = [
+        [{ text: "Portret", callback_data: "ord_genre_portret" }, { text: "Manzara", callback_data: "ord_genre_manzara" }],
+        [{ text: "Natyurmort", callback_data: "ord_genre_natyurmort" }, { text: "Abstrakt", callback_data: "ord_genre_abstrakt" }],
+        [{ text: "Animalistik", callback_data: "ord_genre_animal" }, { text: "Zamonaviy", callback_data: "ord_genre_zamonaviy" }]
+      ];
+      await sendTgMsg(ORDER_BOT_TOKEN, chatId, "Assalomu alaykum! SARDOR ART dan maxsus rasm zakaz qilmoqchisiz. Keling, boshladik!\n\n1-qadam: Rasm janrini tanlang:", { inline_keyboard: genres });
+      return;
+    }
 
-      const state = DATA.botStates[chatId];
-      if (!state) return;
+    const stateDoc = await botStatesCol.findOne({ chatId });
+    
+    if (!stateDoc && (msg.location || msg.venue || msg.contact)) {
+      await sendTgMsg(ORDER_BOT_TOKEN, chatId, "Sessiya eskirgan. Iltimos, /start buyrug'ini bosib, qaytadan boshlang.");
+      return;
+    }
 
-      // Mavzu kiritilganda
-      if (state.step === 'theme' && msg.text) {
-        state.data.theme = msg.text;
-        state.step = 'phone';
-        await saveData();
-        await sendTgMsg(ORDER_BOT_TOKEN, chatId, "Telefon raqamingizni yuboring:", {
-          keyboard: [[{ text: "📱 Raqamni yuborish", request_contact: true }]],
-          resize_keyboard: true,
-          one_time_keyboard: true
-        });
-        return;
-      }
-
-      // Telefon raqam yuborilganda
-      if (state.step === 'phone' && (msg.contact || msg.text)) {
-        state.data.phone = msg.contact ? msg.contact.phone_number : msg.text;
-        state.step = 'address';
-        await saveData();
+    if (stateDoc) {
+      if (stateDoc.step === 'phone' && msg.contact) {
+        await botStatesCol.updateOne({ chatId }, { $set: { step: 'address', 'data.phone': msg.contact.phone_number } });
         await sendTgMsg(ORDER_BOT_TOKEN, chatId, "Rahmat! Endi manzilingizni yuboring (Lokatsiya orqali yoki yozma ravishda):", {
           keyboard: [[{ text: "📍 Lokatsiyani yuborish", request_location: true }]],
           resize_keyboard: true,
@@ -251,58 +264,44 @@ async function handleOrderUpdate(update) {
         return;
       }
 
-      // Lokatsiya yoki Venue (Joy nomi bilan lokatsiya) kelganda
-     if (state.step === 'address' && `(msg.location  msg.venue  msg.text)`) {
-  let addressStr = '';
-  if (msg.location) {
-    addressStr = `📍 Lokatsiya: https://www.google.com/maps?q=${msg.location.latitude},${msg.location.longitude}`;
-  } else if (msg.venue) {
-    addressStr = `📍 Joy: ${msg.venue.title}\nhttps://www.google.com/maps?q=${msg.venue.location.latitude},${msg.venue.location.longitude}`;
-  } else {
-    addressStr = `📍 Manzil: ${msg.text}`;
-  }
-  
-  state.data.address = addressStr;
-  
-  const sizePrices = { '400': '400,000', '600': '600,000', '900': '900,000', '1200': '1,200,000', '1800': '1,800,000', '2500': '2,500,000' };
-  const price = sizePrices[state.data.size] || 'Kelishilgan holda';
-  
-  const summary = `🎨 Yangi ZAKAZ!\n\nJanr: ${state.data.genre}\nO'lcham: ${state.data.size}\nMavzu: ${state.data.theme}\nTel: ${state.data.phone}\n${state.data.address}`;
-  
-  // 1. ADMINGA XABAR YUBORISH (Alohida himoyalangan)
-  try {
-    await sendTgMsg(ORDER_BOT_TOKEN, ADMIN_CHAT_ID, summary);
-  } catch (e) { 
-    console.error("Adminga xabar yuborishda xato (Botga start bosilganmi?):", e); 
-  }
+      if (stateDoc.step === 'address' && (msg.location || msg.venue || msg.text)) {
+        let addressStr = '';
+        if (msg.location) {
+          addressStr = `📍 Lokatsiya: https://www.google.com/maps?q=${msg.location.latitude},${msg.location.longitude}`;
+        } else if (msg.venue) {
+          addressStr = `📍 Joy: ${escapeHtml(msg.venue.title)}\nhttps://www.google.com/maps?q=${msg.venue.location.latitude},${msg.venue.location.longitude}`;
+        } else {
+          addressStr = `📍 Manzil: ${escapeHtml(msg.text)}`;
+        }
+        
+        const sizePrices = { '400': '400,000', '600': '600,000', '900': '900,000', '1200': '1,200,000', '1800': '1,800,000', '2500': '2,500,000' };
+        const price = sizePrices[stateDoc.data.size] || 'Kelishilgan holda';
+        
+        const summary = `🎨 Yangi ZAKAZ!\n\nJanr: ${escapeHtml(stateDoc.data.genre)}\nO'lcham: ${escapeHtml(stateDoc.data.size)}\nMavzu: ${escapeHtml(stateDoc.data.theme)}\nTel: ${escapeHtml(stateDoc.data.phone)}\n${addressStr}`;
+        
+        try { await sendTgMsg(ORDER_BOT_TOKEN, ADMIN_CHAT_ID, summary); } catch (e) {}
 
-  // 2. MIJOZGA MINNATDORCHILIK BILDIRISH
-  const finalMsg = `✅ Buyurtmangiz qabul qilindi!\n\n<b>Janr: ${state.data.genre}\n O'lcham: ${state.data.size} sm\n<b>Mavzu:</b> ${state.data.theme}\n<b>Taxminiy narxi: ${price} so'm\n\nTez orada mutaxassislarimiz siz bilan aloqaga chiqishadi. SARDOR ART ni tanlaganingiz uchun tashakkur!\n\n🌐 Telegram: https://t.me/sardor_artest_uz\n📸 Instagram: https://www.instagram.com/sardor_art_painter`;
-  
-  try {
-    await sendTgMsg(ORDER_BOT_TOKEN, chatId, finalMsg, { 
-      inline_keyboard: [[{ text: "🌐 Saytga qaytish", url: SITE_URL }]] 
-    });
-  } catch (e) { 
-    console.error("Mijozga xabar yuborishda xato:", e); 
-  }
+        const finalMsg = `<b>✅ Buyurtmangiz qabul qilindi!</b>\n\n<b>Janr:</b> ${escapeHtml(stateDoc.data.genre)}\n<b>O'lcham:</b> ${escapeHtml(stateDoc.data.size)} sm\n<b>Mavzu:</b> ${escapeHtml(stateDoc.data.theme)}\n<b>Taxminiy narxi:</b> <b>${price} so'm</b>\n\nTez orada mutaxassislarimiz siz bilan aloqaga chiqishadi. SARDOR ART ni tanlaganingiz uchun tashakkur!\n\n🌐 Telegram: https://t.me/sardor_artest_uz\n📸 Instagram: https://www.instagram.com/sardor_art_painter`;
+        
+        try {
+          await sendTgMsg(ORDER_BOT_TOKEN, chatId, finalMsg, {
+            remove_keyboard: true,
+            inline_keyboard: [[{ text: "🌐 Saytga qaytish", url: SITE_URL }]]
+          });
+        } catch (e) {}
 
-  // Sessiyani tozalash
-  delete DATA.botStates[chatId];
-  await saveData();
-  return;
-}
+        await botStatesCol.deleteOne({ chatId });
+        return;
+      }
     }
   } catch (err) {
     console.error('Order bot xatosi:', err);
-    const chatId = typeof update !== 'undefined' ? update?.message?.chat?.id : null;
-    if (chatId) {
-      await sendTgMsg(ORDER_BOT_TOKEN, chatId, "Kechirasiz, tizimda xatolik yuz berdi. Iltimos, /start bosib qaytadan urinib ko'ring.");
-    }
   }
 }
 
+// ==========================================
 // EXPRESS SERVER VA API
+// ==========================================
 const app = express();
 app.disable('x-powered-by');
 app.use(express.json({ limit: '3mb' }));
@@ -318,9 +317,12 @@ const rlBuckets = new Map();
 setInterval(() => rlBuckets.clear(), 60000);
 function rateLimit(max) {
   return (req, res, next) => {
-    const ip = req.ip; let b = rlBuckets.get(ip);
+    const ip = req.ip;
+    let b = rlBuckets.get(ip);
     if (!b) { b = { count: 0 }; rlBuckets.set(ip, b); }
-    b.count++; if (b.count > max) return res.status(429).json({ error: 'Ko\'p so\'rov.' }); next();
+    b.count++;
+    if (b.count > max) return res.status(429).json({ error: "Ko'p so'rov." });
+    next();
   };
 }
 app.use(express.static(path.join(__dirname, 'public')));
@@ -329,54 +331,61 @@ function auth(required = true) {
   return async (req, res, next) => {
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) return required ? res.status(401).json({ error: 'Avtorizatsiya talab qilinadi' }) : next();
-    const session = DATA.sessions[token];
+    
+    const session = await sessionsCol.findOne({ token });
     if (!session) return res.status(401).json({ error: 'Sessiya eskirgan' });
-    const user = DATA.users[session.phone];
+    
+    const user = await usersCol.findOne({ phone: session.phone });
     if (!user) return res.status(401).json({ error: 'Foydalanuvchi topilmadi' });
-    req.user = user; req.token = token; next();
+    
+    req.user = user;
+    req.token = token;
+    next();
   };
 }
 
 app.post('/api/auth/start', rateLimit(10), async (req, res) => {
   try {
     const { role } = req.body || {};
-    if (role !== 'customer' && role !== 'seller') {
-      return res.status(400).json({ error: 'Rol noto\'g\'ri' });
-    }
     const nonce = crypto.randomBytes(16).toString('hex');
-    DATA.authNonces[nonce] = { role, createdAt: Date.now(), status: 'pending' };
-    await saveData();
+    await authNoncesCol.insertOne({ nonce, role, createdAt: Date.now(), status: 'pending' });
     res.json({ nonce, url: `https://t.me/${AUTH_BOT_USERNAME}?start=${nonce}` });
   } catch (err) {
     res.status(500).json({ error: 'Serverda xatolik yuz berdi.' });
   }
 });
 
-app.get('/api/auth/status', (req, res) => {
-  const auth = DATA.authNonces[req.query.nonce];
-  res.json({ status: auth ? auth.status : 'not_found' });
+app.get('/api/auth/status', async (req, res) => {
+  const authDoc = await authNoncesCol.findOne({ nonce: req.query.nonce });
+  res.json({ status: authDoc ? authDoc.status : 'not_found' });
 });
 
 app.post('/api/auth/verify', rateLimit(10), async (req, res) => {
   try {
-    const { nonce, code } = req.body || {};
-    const auth = DATA.authNonces[nonce];
-    if (!auth || Date.now() - auth.createdAt > 600000) return res.status(400).json({ error: 'Kod muddati o\'tgan' });
-    const hash = crypto.createHash('sha256').update(String(code)).digest('hex');
-    if (hash !== auth.codeHash) {
-      auth.attempts = (auth.attempts || 0) + 1;
-      if (auth.attempts >= 5) delete DATA.authNonces[nonce];
-      await saveData();
-      return res.status(400).json({ error: 'Kod xato' });
+    const { nonce, code } = req.body;
+    const authDoc = await authNoncesCol.findOne({ nonce });
+    if (!authDoc || Date.now() - authDoc.createdAt > 600000) {
+      return res.status(400).json({ error: "Kod muddati o'tgan" });
     }
-
+    
+    const hash = crypto.createHash('sha256').update(String(code)).digest('hex');
+    if (hash !== authDoc.codeHash) return res.status(400).json({ error: 'Kod xato' });
+    
     const token = crypto.randomBytes(32).toString('hex');
-    DATA.sessions[token] = { phone: auth.phone, role: auth.role, createdAt: Date.now() };
-    DATA.users[auth.phone] = { ...DATA.users[auth.phone], phone: auth.phone, role: auth.role, telegramId: auth.chatId };
-    delete DATA.authNonces[nonce];
-    await saveData();
-
-    sendTgMsg(AUTH_BOT_TOKEN, auth.chatId, `✅ Muvaffaqiyatli ro'yxatdan o'tdingiz!`, { inline_keyboard: [[{ text: "🌐 Saytga qaytish", url: SITE_URL }]] });
+    await sessionsCol.insertOne({ token, phone: authDoc.phone, role: authDoc.role, createdAt: Date.now() });
+    
+    const existingUser = await usersCol.findOne({ phone: authDoc.phone });
+    if (!existingUser) {
+      await usersCol.insertOne({ phone: authDoc.phone, role: authDoc.role, telegramId: authDoc.chatId, createdAt: Date.now() });
+    } else {
+      await usersCol.updateOne({ phone: authDoc.phone }, { $set: { role: authDoc.role, telegramId: authDoc.chatId } });
+    }
+    
+    await authNoncesCol.deleteOne({ nonce });
+    
+    sendTgMsg(AUTH_BOT_TOKEN, authDoc.chatId, "✅ Muvaffaqiyatli ro'yxatdan o'tdingiz!", {
+      inline_keyboard: [[{ text: "🌐 Saytga qaytish", url: SITE_URL }]]
+    });
     res.json({ token });
   } catch (err) {
     res.status(500).json({ error: 'Serverda xatolik yuz berdi.' });
@@ -385,81 +394,140 @@ app.post('/api/auth/verify', rateLimit(10), async (req, res) => {
 
 app.get('/api/me', auth(), (req, res) => res.json({ user: { phone: req.user.phone, role: req.user.role } }));
 
-app.get('/api/products', (req, res) => {
-  let list = DATA.products.filter(p => p.status === 'available');
+app.get('/api/products', async (req, res) => {
+  let query = { status: 'available' };
   const { q, genre } = req.query;
-  if (q) list = list.filter(p => p.name.toLowerCase().includes(q.toLowerCase()));
-  if (genre && genre !== 'all') list = list.filter(p => p.genre === genre);
-  list.sort((a, b) => b.createdAt - a.createdAt);
-  res.json({ products: list.map(p => {
-    const d = p.discount || 0; const finalPrice = d > 0 ? Math.round(p.price * (1 - d / 100)) : p.price;
-    return { id: p.id, name: p.name, price: finalPrice, originalPrice: p.price, discount: d, genre: p.genre, paymentType: p.paymentType, image: p.image };
-  })});
+  if (q) query.name = { $regex: q, $options: 'i' };
+  if (genre && genre !== 'all') query.genre = genre;
+  
+  const list = await productsCol.find(query).sort({ createdAt: -1 }).toArray();
+  res.json({
+    products: list.map(p => {
+      const d = p.discount || 0;
+      const finalPrice = d > 0 ? Math.round(p.price * (1 - d / 100)) : p.price;
+      return {
+        id: p.id,
+        name: p.name,
+        price: finalPrice,
+        originalPrice: p.price,
+        discount: d,
+        genre: p.genre,
+        paymentType: p.paymentType,
+        image: p.image
+      };
+    })
+  });
 });
 
-app.get('/api/products/:id', (req, res) => {
-  const p = DATA.products.find(x => x.id === req.params.id && x.status === 'available');
+app.get('/api/products/:id', async (req, res) => {
+  const p = await productsCol.findOne({ id: req.params.id, status: 'available' });
   if (!p) return res.status(404).json({ error: 'Topilmadi' });
-  const d = p.discount || 0; const finalPrice = d > 0 ? Math.round(p.price * (1 - d / 100)) : p.price;
-  res.json({ product: { id: p.id, name: p.name, price: finalPrice, originalPrice: p.price, discount: d, genre: p.genre, paymentType: p.paymentType, image: p.image, description: p.description || '' } });
+  const d = p.discount || 0;
+  const finalPrice = d > 0 ? Math.round(p.price * (1 - d / 100)) : p.price;
+  res.json({
+    product: {
+      id: p.id,
+      name: p.name,
+      price: finalPrice,
+      originalPrice: p.price,
+      discount: d,
+      genre: p.genre,
+      paymentType: p.paymentType,
+      image: p.image,
+      description: p.description || ''
+    }
+  });
 });
 
-app.get('/api/seller/products', auth(), (req, res) => {
-  if (req.user.role !== 'seller') return res.status(403).json({ error: 'Ruxsat yo\'q' });
-  res.json({ products: DATA.products.filter(p => p.sellerPhone === req.user.phone) });
+app.get('/api/seller/products', auth(), async (req, res) => {
+  if (req.user.role !== 'seller') return res.status(403).json({ error: "Ruxsat yo'q" });
+  const list = await productsCol.find({ sellerPhone: req.user.phone }).sort({ createdAt: -1 }).toArray();
+  res.json({ products: list });
 });
 
 app.post('/api/seller/products', auth(), rateLimit(20), async (req, res) => {
-  if (req.user.role !== 'seller') return res.status(403).json({ error: 'Ruxsat yo\'q' });
-  const { name, price, genre, paymentType, image, description, discount } = req.body || {};
+  if (req.user.role !== 'seller') return res.status(403).json({ error: "Ruxsat yo'q" });
+  const { name, price, genre, paymentType, image, description, discount } = req.body;
   const disc = Number(discount) || 0;
-  if (!name || !price || !image) return res.status(400).json({ error: 'Ma\'lumotlar to\'liq emas' });
+  if (!name || !price || !image) return res.status(400).json({ error: "Ma'lumotlar to'liq emas" });
+  
   const id = crypto.randomBytes(8).toString('hex');
-  const product = { id, name, price: Number(price), genre, paymentType, image, description: description || '', discount: disc, sellerPhone: req.user.phone, status: 'available', createdAt: Date.now() };
-  DATA.products.push(product); await saveData(); res.json({ product });
+  const product = {
+    id,
+    name,
+    price,
+    genre,
+    paymentType,
+    image,
+    description: description || '',
+    discount: disc,
+    sellerPhone: req.user.phone,
+    status: 'available',
+    createdAt: Date.now()
+  };
+  
+  await productsCol.insertOne(product);
+  res.json({ product });
 });
 
 app.delete('/api/seller/products/:id', auth(), async (req, res) => {
-  if (req.user.role !== 'seller') return res.status(403).json({ error: 'Ruxsat yo\'q' });
-  const idx = DATA.products.findIndex(p => p.id === req.params.id && p.sellerPhone === req.user.phone);
-  if (idx !== -1) DATA.products.splice(idx, 1);
-  await saveData(); res.json({ ok: true });
+  if (req.user.role !== 'seller') return res.status(403).json({ error: "Ruxsat yo'q" });
+  await productsCol.deleteOne({ id: req.params.id, sellerPhone: req.user.phone });
+  res.json({ ok: true });
 });
 
-app.get('/api/seller/sold', auth(), (req, res) => {
-  if (req.user.role !== 'seller') return res.status(403).json({ error: 'Ruxsat yo\'q' });
-  res.json({ orders: DATA.orders.filter(o => o.sellerPhone === req.user.phone).sort((a, b) => b.createdAt - a.createdAt) });
+app.get('/api/seller/sold', auth(), async (req, res) => {
+  if (req.user.role !== 'seller') return res.status(403).json({ error: "Ruxsat yo'q" });
+  const list = await ordersCol.find({ sellerPhone: req.user.phone }).sort({ createdAt: -1 }).toArray();
+  res.json({ orders: list });
 });
 
 app.post('/api/orders', auth(), rateLimit(10), async (req, res) => {
-  if (req.user.role !== 'customer') return res.status(403).json({ error: 'Ruxsat yo\'q' });
-  const { items, buyerName, buyerPhone, lat, lng } = req.body || {};
-  if (!Array.isArray(items) || !items.length) return res.status(400).json({ error: 'Savat bo\'sh' });
-
-  const matchedProducts = [];
-  for (const item of items) {
-    const p = DATA.products.find(x => x.id === item.id);
-    if (!p || p.status !== 'available') return res.status(400).json({ error: `Asar topilmadi: ${item.name || ''}` });
-    matchedProducts.push(p);
+  if (req.user.role !== 'customer') return res.status(403).json({ error: "Ruxsat yo'q" });
+  const { items, buyerName, buyerPhone, lat, lng } = req.body;
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: "Buyurtma ro'yxati bo'sh" });
   }
-
   const createdOrders = [];
-  for (const p of matchedProducts) {
-    const d = p.discount || 0; const finalPrice = d > 0 ? Math.round(p.price * (1 - d / 100)) : p.price;
-    p.status = 'sold';
-    const order = { id: crypto.randomBytes(8).toString('hex'), productId: p.id, productName: p.name, price: finalPrice, paymentType: p.paymentType, buyerName, buyerPhone, lat, lng, sellerPhone: p.sellerPhone, createdAt: Date.now() };
-    DATA.orders.push(order); createdOrders.push(order);
-    const seller = DATA.users[p.sellerPhone];
-    if (seller && seller.telegramId) sendTgMsg(AUTH_BOT_TOKEN, seller.telegramId, `🎉 Asar sotildi!\n${p.name}\nMijoz: ${buyerName}`);
+  
+  for (const item of items) {
+    const p = await productsCol.findOne({ id: item.id, status: 'available' });
+    if (!p) return res.status(400).json({ error: `Asar topilmadi: ${item.name}` });
+    
+    const d = p.discount || 0;
+    const finalPrice = d > 0 ? Math.round(p.price * (1 - d / 100)) : p.price;
+    await productsCol.updateOne({ id: p.id }, { $set: { status: 'sold' } });
+    
+    const order = {
+      id: crypto.randomBytes(8).toString('hex'),
+      productId: p.id,
+      productName: p.name,
+      price: finalPrice,
+      paymentType: p.paymentType,
+      buyerName,
+      buyerPhone,
+      lat,
+      lng,
+      sellerPhone: p.sellerPhone,
+      createdAt: Date.now()
+    };
+    await ordersCol.insertOne(order);
+    createdOrders.push(order);
+    
+    const seller = await usersCol.findOne({ phone: p.sellerPhone });
+    if (seller && seller.telegramId) {
+      sendTgMsg(AUTH_BOT_TOKEN, seller.telegramId, `🎉 Asar sotildi!\n${escapeHtml(p.name)}\nMijoz: ${escapeHtml(buyerName)}`);
+    }
   }
-  await saveData(); res.json({ ok: true, orders: createdOrders });
+  
+  res.json({ ok: true, orders: createdOrders });
 });
 
 (async () => {
-  await loadData();
-  app.listen(PORT, () => {
-    console.log(`Server: http://localhost:${PORT}`);
-    pollAuthUpdates();
-    pollOrderUpdates();
+  await connectDB();
+  app.listen(PORT, () => { 
+    console.log(`Server: http://localhost:${PORT}`); 
+    pollAuthUpdates(); 
+    pollOrderUpdates(); 
   });
 })();
