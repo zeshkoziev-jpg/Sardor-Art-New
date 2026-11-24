@@ -38,11 +38,11 @@ function escapeHtml(str) {
 }
 
 async function connectDB() {
-  if (!MONGODB_URI) {
-    console.error("XATO: MONGODB_URI berilmagan! Server to'xtatildi.");
-    process.exit(1);
-  }
-  const client = new MongoClient(MONGODB_URI);
+  if (!MONGODB_URI) throw new Error('MONGODB_URI berilmagan!');
+  const client = new MongoClient(MONGODB_URI, {
+    serverSelectionTimeoutMS: 15000,
+    maxPoolSize: 10
+  });
   await client.connect();
   db = client.db('sardorart');
   usersCol = db.collection('users');
@@ -325,6 +325,12 @@ function rateLimit(max) {
     next();
   };
 }
+
+app.use('/api', (req, res, next) => {
+  if (!db) return res.status(503).json({ error: 'Server tayyorlanmoqda, birozdan so\'ng urinib ko\'ring.' });
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 function auth(required = true) {
@@ -523,11 +529,22 @@ app.post('/api/orders', auth(), rateLimit(10), async (req, res) => {
   res.json({ ok: true, orders: createdOrders });
 });
 
+process.on('unhandledRejection', e => console.error('Unhandled:', e));
+process.on('uncaughtException', e => console.error('Uncaught:', e));
+
 (async () => {
-  await connectDB();
-  app.listen(PORT, () => { 
-    console.log(`Server: http://localhost:${PORT}`); 
-    pollAuthUpdates(); 
-    pollOrderUpdates(); 
-  });
+  app.listen(PORT, () => console.log`(Server: http://localhost:${PORT})`)
+
+  while (true) {
+    try {
+      await connectDB();
+      break;
+    } catch (err) {
+      console.error('MongoDB ulanish xatosi, 5 soniyadan so\'ng qayta uriniladi:', err.message);
+      await new Promise(r => setTimeout(r, 5000));
+    }
+  }
+
+  pollAuthUpdates();
+  pollOrderUpdates();
 })();
