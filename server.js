@@ -19,8 +19,8 @@ if (fs.existsSync('.env')) {
 }
 
 const PORT = process.env.PORT || 3000;
-const AUTH_BOT_TOKEN = process.env.AUTH_BOT_TOKEN;
-const AUTH_BOT_USERNAME = process.env.AUTH_BOT_USERNAME || 'SardorArt_Bot';
+const AUTH_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const AUTH_BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME || 'SardorArtBot';
 const ORDER_BOT_TOKEN = process.env.ORDER_BOT_TOKEN;
 const ORDER_BOT_USERNAME = process.env.ORDER_BOT_USERNAME || 'SardorOrderBot';
 const SITE_URL = process.env.SITE_URL || `http://localhost:${PORT}`;
@@ -29,20 +29,9 @@ const MONGODB_URI = process.env.MONGODB_URI;
 
 let db, usersCol, sessionsCol, authNoncesCol, productsCol, ordersCol, botStatesCol;
 
-// Foydalanuvchi matnidagi < > & belgilarini HTML xatolik bermasligi uchun tozalash
-function escapeHtml(str) {
-  return String(str || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-
 async function connectDB() {
-  if (!MONGODB_URI) throw new Error('MONGODB_URI berilmagan!');
-  const client = new MongoClient(MONGODB_URI, {
-    serverSelectionTimeoutMS: 15000,
-    maxPoolSize: 10
-  });
+  if (!MONGODB_URI) return console.log("MONGODB_URI berilmagan!");
+  const client = new MongoClient(MONGODB_URI);
   await client.connect();
   db = client.db('sardorart');
   usersCol = db.collection('users');
@@ -105,67 +94,63 @@ async function pollAuthUpdates() {
 }
 
 async function handleAuthUpdate(update) {
-  try {
-    if (!update.message) return;
-    const msg = update.message;
-    const chatId = msg.chat.id;
+  if (!update.message) return;
+  const msg = update.message;
+  const chatId = msg.chat.id;
 
-    if (msg.text && msg.text.startsWith('/start')) {
-      const parts = msg.text.split(' ');
-      const nonce = parts.length > 1 ? parts[1] : null;
-      
-      if (nonce) {
-        const auth = await authNoncesCol.findOne({ nonce });
-        if (auth && Date.now() - auth.createdAt < 10 * 60 * 1000) {
-          await authNoncesCol.updateOne({ nonce }, { $set: { chatId, status: 'waiting_contact' } });
-          let roleText = auth.role === 'seller' ? 'savdogar' : 'mijoz';
-          await sendTgMsg(
-            AUTH_BOT_TOKEN,
-            chatId,
-            `Assalomu alaykum, hurmatli ${roleText}! SARDOR ART ga xush kelibsiz. Davom etish uchun telefon raqamingizni yuboring.`,
-            {
-              keyboard: [[{ text: "📱 Raqamni yuborish", request_contact: true }]],
-              resize_keyboard: true,
-              one_time_keyboard: true
-            }
-          );
-          return;
-        }
-      }
-      await sendTgMsg(AUTH_BOT_TOKEN, chatId, 'Xatolik: Havola eskirgan.');
-      return;
-    }
-
-    if (msg.contact) {
-      const auth = await authNoncesCol.findOne({ chatId, status: 'waiting_contact' });
-      if (auth) {
-        if (msg.contact.user_id !== msg.from.id) {
-          return sendTgMsg(AUTH_BOT_TOKEN, chatId, "Faqat o'z raqamingizni yuboring.");
-        }
-        let phone = msg.contact.phone_number;
-        if (!phone.startsWith('+')) phone = '+' + phone;
-        if (!/^\+998\d{9}$/.test(phone)) {
-          return sendTgMsg(AUTH_BOT_TOKEN, chatId, "Format noto'g'ri (+998XXXXXXXXX).");
-        }
-        
-        const code = String(crypto.randomInt(100000, 999999));
-        const codeHash = crypto.createHash('sha256').update(code).digest('hex');
-        
-        await authNoncesCol.updateOne(
-          { nonce: auth.nonce }, 
-          { $set: { phone, codeHash, status: 'waiting_code', attempts: 0, sentAt: Date.now() } }
-        );
-        
+  if (msg.text && msg.text.startsWith('/start')) {
+    const parts = msg.text.split(' ');
+    const nonce = parts.length > 1 ? parts[1] : null;
+    
+    if (nonce) {
+      const auth = await authNoncesCol.findOne({ nonce });
+      if (auth && Date.now() - auth.createdAt < 10 * 60 * 1000) {
+        await authNoncesCol.updateOne({ nonce }, { $set: { chatId, status: 'waiting_contact' } });
+        let roleText = auth.role === 'seller' ? 'savdogar' : 'mijoz';
         await sendTgMsg(
           AUTH_BOT_TOKEN,
           chatId,
-          `Rahmat! Saytga qaytib ushbu kodni kiriting:\n\n<code>${code}</code>`,
-          { remove_keyboard: true }
+          `Assalomu alaykum, hurmatli ${roleText}! SARDOR ART ga xush kelibsiz. Davom etish uchun telefon raqamingizni yuboring.`,
+          {
+            keyboard: [[{ text: "📱 Raqamni yuborish", request_contact: true }]],
+            resize_keyboard: true,
+            one_time_keyboard: true
+          }
         );
+        return;
       }
     }
-  } catch (err) {
-    console.error('Auth bot xatosi:', err);
+    await sendTgMsg(AUTH_BOT_TOKEN, chatId, "Xatolik: Havola eskirgan. Iltimos, saytga qaytib, qaytadan urinib ko'ring.");
+    return;
+  }
+
+  if (msg.contact) {
+    const auth = await authNoncesCol.findOne({ chatId, status: 'waiting_contact' });
+    if (auth) {
+      if (msg.contact.user_id !== msg.from.id) {
+        return sendTgMsg(AUTH_BOT_TOKEN, chatId, "Faqat o'z raqamingizni yuboring.");
+      }
+      let phone = msg.contact.phone_number;
+      if (!phone.startsWith('+')) phone = '+' + phone;
+      if (!/^\+998\d{9}$/.test(phone)) {
+        return sendTgMsg(AUTH_BOT_TOKEN, chatId, "Format noto'g'ri (+998XXXXXXXXX).");
+      }
+      
+      const code = String(crypto.randomInt(100000, 999999));
+      const codeHash = crypto.createHash('sha256').update(code).digest('hex');
+      
+      await authNoncesCol.updateOne(
+        { nonce: auth.nonce }, 
+        { $set: { phone, codeHash, status: 'waiting_code', attempts: 0, sentAt: Date.now() } }
+      );
+      
+      await sendTgMsg(
+        AUTH_BOT_TOKEN,
+        chatId,
+        `Rahmat! Saytga qaytib ushbu kodni kiriting:\n\n<code>${code}</code>`,
+        { remove_keyboard: true }
+      );
+    }
   }
 }
 
@@ -269,26 +254,25 @@ async function handleOrderUpdate(update) {
         if (msg.location) {
           addressStr = `📍 Lokatsiya: https://www.google.com/maps?q=${msg.location.latitude},${msg.location.longitude}`;
         } else if (msg.venue) {
-          addressStr = `📍 Joy: ${escapeHtml(msg.venue.title)}\nhttps://www.google.com/maps?q=${msg.venue.location.latitude},${msg.venue.location.longitude}`;
+          addressStr = `📍 Joy: ${msg.venue.title}\nhttps://www.google.com/maps?q=${msg.venue.location.latitude},${msg.venue.location.longitude}`;
         } else {
-          addressStr = `📍 Manzil: ${escapeHtml(msg.text)}`;
+          addressStr = `📍 Manzil: ${msg.text}`;
         }
         
         const sizePrices = { '400': '400,000', '600': '600,000', '900': '900,000', '1200': '1,200,000', '1800': '1,800,000', '2500': '2,500,000' };
         const price = sizePrices[stateDoc.data.size] || 'Kelishilgan holda';
         
-        const summary = `🎨 Yangi ZAKAZ!\n\nJanr: ${escapeHtml(stateDoc.data.genre)}\nO'lcham: ${escapeHtml(stateDoc.data.size)}\nMavzu: ${escapeHtml(stateDoc.data.theme)}\nTel: ${escapeHtml(stateDoc.data.phone)}\n${addressStr}`;
+        const summary = `🎨 Yangi ZAKAZ!\n\nJanr: ${stateDoc.data.genre}\nO'lcham: ${stateDoc.data.size}\nMavzu: ${stateDoc.data.theme}\nTel: ${stateDoc.data.phone}\n${addressStr}`;
         
-        try { await sendTgMsg(ORDER_BOT_TOKEN, ADMIN_CHAT_ID, summary); } catch (e) {}
+        await sendTgMsg(ORDER_BOT_TOKEN, ADMIN_CHAT_ID, summary);
 
-        const finalMsg = `<b>✅ Buyurtmangiz qabul qilindi!</b>\n\n<b>Janr:</b> ${escapeHtml(stateDoc.data.genre)}\n<b>O'lcham:</b> ${escapeHtml(stateDoc.data.size)} sm\n<b>Mavzu:</b> ${escapeHtml(stateDoc.data.theme)}\n<b>Taxminiy narxi:</b> <b>${price} so'm</b>\n\nTez orada mutaxassislarimiz siz bilan aloqaga chiqishadi. SARDOR ART ni tanlaganingiz uchun tashakkur!\n\n🌐 Telegram: https://t.me/sardor_artest_uz\n📸 Instagram: https://www.instagram.com/sardor_art_painter`;
+        const finalMsg = `<b>✅ Buyurtmangiz qabul qilindi!</b>\n\n<b>Janr:</b> ${stateDoc.data.genre}\n<b>O'lcham:</b> ${stateDoc.data.size} sm\n<b>Mavzu:</b> ${stateDoc.data.theme}\n<b>Taxminiy narxi:</b> <b>${price} so'm</b>\n\nTez orada mutaxassislarimiz siz bilan aloqaga chiqishadi. SARDOR ART ni tanlaganingiz uchun tashakkur!\n\n🌐 Telegram: https://t.me/sardor_artest_uz\n📸 Instagram: https://www.instagram.com/sardor_art_painter`;
         
-        try {
-          await sendTgMsg(ORDER_BOT_TOKEN, chatId, finalMsg, {
-            remove_keyboard: true,
-            inline_keyboard: [[{ text: "🌐 Saytga qaytish", url: SITE_URL }]]
-          });
-        } catch (e) {}
+        const replyMarkup = SITE_URL.startsWith('https://') 
+          ? { inline_keyboard: [[{ text: "🌐 Saytga qaytish", url: SITE_URL }]] } 
+          : { remove_keyboard: true };
+
+        await sendTgMsg(ORDER_BOT_TOKEN, chatId, finalMsg, replyMarkup);
 
         await botStatesCol.deleteOne({ chatId });
         return;
@@ -325,12 +309,6 @@ function rateLimit(max) {
     next();
   };
 }
-
-app.use('/api', (req, res, next) => {
-  if (!db) return res.status(503).json({ error: 'Server tayyorlanmoqda, birozdan so\'ng urinib ko\'ring.' });
-  next();
-});
-
 app.use(express.static(path.join(__dirname, 'public')));
 
 function auth(required = true) {
@@ -362,36 +340,40 @@ app.post('/api/auth/start', rateLimit(10), async (req, res) => {
 });
 
 app.get('/api/auth/status', async (req, res) => {
-  const authDoc = await authNoncesCol.findOne({ nonce: req.query.nonce });
-  res.json({ status: authDoc ? authDoc.status : 'not_found' });
+  const auth = await authNoncesCol.findOne({ nonce: req.query.nonce });
+  res.json({ status: auth ? auth.status : 'not_found' });
 });
 
 app.post('/api/auth/verify', rateLimit(10), async (req, res) => {
   try {
     const { nonce, code } = req.body;
-    const authDoc = await authNoncesCol.findOne({ nonce });
-    if (!authDoc || Date.now() - authDoc.createdAt > 600000) {
+    const auth = await authNoncesCol.findOne({ nonce });
+    if (!auth || Date.now() - auth.createdAt > 600000) {
       return res.status(400).json({ error: "Kod muddati o'tgan" });
     }
     
     const hash = crypto.createHash('sha256').update(String(code)).digest('hex');
-    if (hash !== authDoc.codeHash) return res.status(400).json({ error: 'Kod xato' });
+    if (hash !== auth.codeHash) {
+      return res.status(400).json({ error: 'Kod xato' });
+    }
     
     const token = crypto.randomBytes(32).toString('hex');
-    await sessionsCol.insertOne({ token, phone: authDoc.phone, role: authDoc.role, createdAt: Date.now() });
+    await sessionsCol.insertOne({ token, phone: auth.phone, role: auth.role, createdAt: Date.now() });
     
-    const existingUser = await usersCol.findOne({ phone: authDoc.phone });
+    const existingUser = await usersCol.findOne({ phone: auth.phone });
     if (!existingUser) {
-      await usersCol.insertOne({ phone: authDoc.phone, role: authDoc.role, telegramId: authDoc.chatId, createdAt: Date.now() });
+      await usersCol.insertOne({ phone: auth.phone, role: auth.role, telegramId: auth.chatId, createdAt: Date.now() });
     } else {
-      await usersCol.updateOne({ phone: authDoc.phone }, { $set: { role: authDoc.role, telegramId: authDoc.chatId } });
+      await usersCol.updateOne({ phone: auth.phone }, { $set: { role: auth.role, telegramId: auth.chatId } });
     }
     
     await authNoncesCol.deleteOne({ nonce });
     
-    sendTgMsg(AUTH_BOT_TOKEN, authDoc.chatId, "✅ Muvaffaqiyatli ro'yxatdan o'tdingiz!", {
-      inline_keyboard: [[{ text: "🌐 Saytga qaytish", url: SITE_URL }]]
-    });
+    const replyMarkup = SITE_URL.startsWith('https://') 
+      ? { inline_keyboard: [[{ text: "🌐 Saytga qaytish", url: SITE_URL }]] } 
+      : null;
+
+    await sendTgMsg(AUTH_BOT_TOKEN, auth.chatId, "✅ Muvaffaqiyatli ro'yxatdan o'tdingiz!", replyMarkup);
     res.json({ token });
   } catch (err) {
     res.status(500).json({ error: 'Serverda xatolik yuz berdi.' });
@@ -400,60 +382,82 @@ app.post('/api/auth/verify', rateLimit(10), async (req, res) => {
 
 app.get('/api/me', auth(), (req, res) => res.json({ user: { phone: req.user.phone, role: req.user.role } }));
 
-app.get('/api/products', (req, res) => {
-  let list = DATA.products.filter(p => p.status === 'available');
+app.get('/api/products', async (req, res) => {
+  let query = { status: 'available' };
   const { q, genre } = req.query;
-  if (q) list = list.filter(p => p.name.toLowerCase().includes(q.toLowerCase()));
-  if (genre && genre !== 'all') list = list.filter(p => p.genre === genre);
-  list.sort((a, b) => b.createdAt - a.createdAt);
-  res.json({ products: list.map(p => {
-    const d = p.discount || 0; const finalPrice = d > 0 ? Math.round(p.price * (1 - d / 100)) : p.price;
-    return { id: p.id, name: p.name, price: finalPrice, originalPrice: p.price, discount: d, genre: p.genre, paymentType: p.paymentType, image: p.image, currency: p.currency || 'UZS' };
-  })});
+  if (q) query.name = { $regex: q, $options: 'i' };
+  if (genre && genre !== 'all') query.genre = genre;
+  
+  const list = await productsCol.find(query).sort({ createdAt: -1 }).toArray();
+  res.json({
+    products: list.map(p => {
+      const d = p.discount || 0;
+      const finalPrice = d > 0 ? Math.round(p.price * (1 - d / 100)) : p.price;
+      return {
+        id: p.id,
+        name: p.name,
+        price: finalPrice,
+        originalPrice: p.price,
+        discount: d,
+        genre: p.genre,
+        paymentType: p.paymentType,
+        image: p.image,
+        currency: p.currency || 'UZS'
+      };
+    })
+  });
 });
 
-app.get('/api/products/:id', (req, res) => {
-  const p = DATA.products.find(x => x.id === req.params.id && x.status === 'available');
+app.get('/api/products/:id', async (req, res) => {
+  const p = await productsCol.findOne({ id: req.params.id, status: 'available' });
   if (!p) return res.status(404).json({ error: 'Topilmadi' });
-  const d = p.discount || 0; const finalPrice = d > 0 ? Math.round(p.price * (1 - d / 100)) : p.price;
-  res.json({ product: `{ id: p.id, name: p.name, price: finalPrice, originalPrice: p.price, discount: d, genre: p.genre, paymentType: p.paymentType, image: p.image, description: p.description  , currency: p.currency , 'UZS' }` });
+  const d = p.discount || 0;
+  const finalPrice = d > 0 ? Math.round(p.price * (1 - d / 100)) : p.price;
+  res.json({
+    product: {
+      id: p.id,
+      name: p.name,
+      price: finalPrice,
+      originalPrice: p.price,
+      discount: d,
+      genre: p.genre,
+      paymentType: p.paymentType,
+      image: p.image,
+      description: p.description || '',
+      currency: p.currency || 'UZS'
+    }
+  });
 });
 
-app.post('/api/seller/products', auth(), rateLimit(20), async (req, res) => {
-  if (req.user.role !== 'seller') return res.status(403).json({ error: 'Ruxsat yo\'q' });
-  const { name, price, genre, paymentType, image, description, discount, currency } = req.body;
-  const disc = Number(discount) || 0;
-  if (!name , !price , !image) return res.status(400).json({ error: 'Ma\'lumotlar to\'liq emas' });
-  
-  const id = crypto.randomBytes(8).toString('hex');
-  const product = { 
-    id, name, price, currency: currency || 'UZS', genre, paymentType, image, 
-    description: description || '', discount: disc, sellerPhone: req.user.phone, 
-    status: 'available', createdAt: Date.now() 
-  };
-  
-  DATA.products.push(product); await saveData(); res.json({ product });
+app.get('/api/seller/products', auth(), async (req, res) => {
+  if (req.user.role !== 'seller') return res.status(403).json({ error: "Ruxsat yo'q" });
+  const list = await productsCol.find({ sellerPhone: req.user.phone }).sort({ createdAt: -1 }).toArray();
+  res.json({ products: list });
 });
 
 app.post('/api/seller/products', auth(), rateLimit(20), async (req, res) => {
   if (req.user.role !== 'seller') return res.status(403).json({ error: "Ruxsat yo'q" });
-  const { name, price, genre, paymentType, image, description, discount } = req.body;
+  const { name, price, genre, paymentType, image, description, discount, currency } = req.body;
+  const numPrice = Number(price);
   const disc = Number(discount) || 0;
-  if (!name || !price || !image) return res.status(400).json({ error: "Ma'lumotlar to'liq emas" });
+  if (!name || !numPrice || numPrice <= 0 || !image) {
+    return res.status(400).json({ error: "Ma'lumotlar to'liq emas" });
+  }
   
   const id = crypto.randomBytes(8).toString('hex');
-  const product = {
+  const product = { 
     id,
     name,
-    price,
+    price: numPrice,
+    currency: currency || 'UZS',
     genre,
     paymentType,
-    image,
+    image, 
     description: description || '',
     discount: disc,
-    sellerPhone: req.user.phone,
+    sellerPhone: req.user.phone, 
     status: 'available',
-    createdAt: Date.now()
+    createdAt: Date.now() 
   };
   
   await productsCol.insertOne(product);
@@ -476,7 +480,7 @@ app.post('/api/orders', auth(), rateLimit(10), async (req, res) => {
   if (req.user.role !== 'customer') return res.status(403).json({ error: "Ruxsat yo'q" });
   const { items, buyerName, buyerPhone, lat, lng } = req.body;
   if (!Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({ error: "Buyurtma ro'yxati bo'sh" });
+    return res.status(400).json({ error: "Savat bo'sh" });
   }
   const createdOrders = [];
   
@@ -488,47 +492,37 @@ app.post('/api/orders', auth(), rateLimit(10), async (req, res) => {
     const finalPrice = d > 0 ? Math.round(p.price * (1 - d / 100)) : p.price;
     await productsCol.updateOne({ id: p.id }, { $set: { status: 'sold' } });
     
-    const order = {
+    const order = { 
       id: crypto.randomBytes(8).toString('hex'),
       productId: p.id,
-      productName: p.name,
+      productName: p.name, 
       price: finalPrice,
-      paymentType: p.paymentType,
+      currency: p.currency || 'UZS',
+      paymentType: p.paymentType, 
       buyerName,
       buyerPhone,
       lat,
       lng,
       sellerPhone: p.sellerPhone,
-      createdAt: Date.now()
+      createdAt: Date.now() 
     };
     await ordersCol.insertOne(order);
     createdOrders.push(order);
     
     const seller = await usersCol.findOne({ phone: p.sellerPhone });
     if (seller && seller.telegramId) {
-      sendTgMsg(AUTH_BOT_TOKEN, seller.telegramId, `🎉 Asar sotildi!\n${escapeHtml(p.name)}\nMijoz: ${escapeHtml(buyerName)}`);
+      await sendTgMsg(AUTH_BOT_TOKEN, seller.telegramId, `🎉 Asar sotildi!\n${p.name}\nMijoz: ${buyerName}`);
     }
   }
   
   res.json({ ok: true, orders: createdOrders });
 });
 
-process.on('unhandledRejection', e => console.error('Unhandled:', e));
-process.on('uncaughtException', e => console.error('Uncaught:', e));
-
 (async () => {
-  app.listen(PORT, () => console.log`(Server: http://localhost:${PORT})`)
-
-  while (true) {
-    try {
-      await connectDB();
-      break;
-    } catch (err) {
-      console.error('MongoDB ulanish xatosi, 5 soniyadan so\'ng qayta uriniladi:', err.message);
-      await new Promise(r => setTimeout(r, 5000));
-    }
-  }
-
-  pollAuthUpdates();
-  pollOrderUpdates();
+  await connectDB();
+  app.listen(PORT, () => { 
+    console.log(`Server: http://localhost:${PORT}`); 
+    pollAuthUpdates(); 
+    pollOrderUpdates(); 
+  });
 })();

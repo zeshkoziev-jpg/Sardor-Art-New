@@ -12,11 +12,12 @@
       cart_total: 'Jami', required: 'Iltimos, maydonlarni to\'ldiring', login_needed: 'Tizimga kiring',
       order_success: 'Buyurtma qabul qilindi!', error_generic: 'Xatolik yuz berdi', image_req: 'Rasm tanlang',
       name: 'Ism', phone: 'Telefon', address: 'Manzil', my_works: 'Mening asarlarim', no_works: 'Hozircha asarlaringiz yo\'q',
-      product_name: 'Asar nomi', price: 'Narx (so\'m)', genre: `Bo'limlar`, payment_type: 'To\'lov turi', public: 'Ommaga taqdim etish',
+      product_name: 'Asar nomi', price: 'Narx', genre: 'Janr', payment_type: 'To\'lov turi', public: 'Ommaga taqdim etish',
       seller_panel: 'Savdogar paneli', sold_items: 'Sotilganlar', buyer: 'Mijoz', map: 'Xarita', payment_info: 'To\'lov ma\'lumoti',
       upfront: 'Oldindan to\'lov', remaining: 'Keyin to\'lash', choose_role: 'Rolni tanlang', customer_role: 'Mijoz',
       seller_role: 'Savdogar', enter_code: 'Tasdiqlash kodini kiriting', verify: 'Tasdiqlash', success_auth: 'Muvaffaqiyatli kirdingiz!', waiting_tg: 'Telegramda botga o\'ting va raqamingizni yuboring...',
-      favorites: 'Sevimlilar', empty_fav: 'Sizda hali sevimli asarlar yo\'q', add_to_fav: 'Sevimlilarga qo\'shildi', remove_from_fav: 'Sevimlilardan olib tashlandi'
+      favorites: 'Sevimlilar', empty_fav: 'Sizda hali sevimli asarlar yo\'q', add_to_fav: 'Sevimlilarga qo\'shildi', remove_from_fav: 'Sevimlilardan olib tashlandi',
+      help_btn: '💬 Yordam uchun', currency: 'Valyuta'
     },
     ru: {
       home: 'Главная', profile: 'Профиль', cart: 'Корзина', logout: 'Выйти', seller: 'Продавец', sold: 'Продано',
@@ -28,11 +29,12 @@
       cart_total: 'Итого', required: 'Заполните поля', login_needed: 'Войдите в систему',
       order_success: 'Заказ принят!', error_generic: 'Ошибка', image_req: 'Выберите картинку',
       name: 'Имя', phone: 'Телефон', address: 'Адрес', my_works: 'Мои работы', no_works: 'У вас пока нет работ',
-      product_name: 'Название', price: 'Цена (сум)', genre: 'Жанр', payment_type: 'Тип оплаты', public: 'Опубликовать',
+      product_name: 'Название', price: 'Цена', genre: 'Жанр', payment_type: 'Тип оплаты', public: 'Опубликовать',
       seller_panel: 'Панель продавца', sold_items: 'Продажи', buyer: 'Клиент', map: 'Карта', payment_info: 'Информация об оплате',
       upfront: 'Предоплата', remaining: 'Остаток', choose_role: 'Выберите роль', customer_role: 'Клиент',
       seller_role: 'Продавец', enter_code: 'Введите код', verify: 'Подтвердить', success_auth: 'Успешный вход!', waiting_tg: 'Перейдите в бота и отправьте номер...',
-      favorites: 'Избранное', empty_fav: 'У вас пока нет избранных работ', add_to_fav: 'Добавлено в избранное', remove_from_fav: 'Удалено из избранного'
+      favorites: 'Избранное', empty_fav: 'У вас пока нет избранных работ', add_to_fav: 'Добавлено в избранное', remove_from_fav: 'Удалено из избранного',
+      help_btn: '💬 Поддержка', currency: 'Валюта'
     },
     en: {
       home: 'Home', profile: 'Profile', cart: 'Cart', logout: 'Logout', seller: 'Seller', sold: 'Sold',
@@ -44,25 +46,26 @@
       cart_total: 'Total', required: 'Fill the fields', login_needed: 'Please login',
       order_success: 'Order placed!', error_generic: 'Error', image_req: 'Select image',
       name: 'Name', phone: 'Phone', address: 'Address', my_works: 'My Works', no_works: 'You have no works yet',
-      product_name: 'Name', price: 'Price (sum)', genre: 'Genre', payment_type: 'Payment Type', public: 'Publish',
+      product_name: 'Name', price: 'Price', genre: 'Genre', payment_type: 'Payment Type', public: 'Publish',
       seller_panel: 'Seller Panel', sold_items: 'Sold Items', buyer: 'Buyer', map: 'Map', payment_info: 'Payment Info',
       upfront: 'Upfront', remaining: 'Remaining', choose_role: 'Choose Role', customer_role: 'Customer',
       seller_role: 'Seller', enter_code: 'Enter Code', verify: 'Verify', success_auth: 'Login successful!', waiting_tg: 'Go to bot and send phone...',
-      favorites: 'Favorites', empty_fav: 'You have no favorite works yet', add_to_fav: 'Added to favorites', remove_from_fav: 'Removed from favorites'
+      favorites: 'Favorites', empty_fav: 'You have no favorite works yet', add_to_fav: 'Added to favorites', remove_from_fav: 'Removed from favorites',
+      help_btn: '💬 Support', currency: 'Currency'
     }
   };
 
   const getLang = () => localStorage.getItem('lang') || 'uz';
-  const t = (key) => (DICT[getLang()] && DICT[getLang()][key]) || key;
+  const t = (key) => DICT[getLang()][key] || key;
   const esc = (s) => String(s || '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
 
-  formatPrice = (price, currency = 'UZS') => {
-  const num = Number(price) || 0;
-  if (currency === 'USD') return '$' + num.toLocaleString('en-US');
-  if (currency === 'RUB') return num.toLocaleString('ru-RU') + ' ₽';
-  return num.toLocaleString('ru-RU') + ' so\'m';
-};
-  const formatPrice = (n) => Number(n).toLocaleString('ru-RU') + ' so\'m';
+  // Valyutani formatlash funksiyasi
+  const formatPrice = (price, currency = 'UZS') => {
+    const num = Number(price) || 0;
+    if (currency === 'USD') return '$' + num.toLocaleString('en-US');
+    if (currency === 'RUB') return num.toLocaleString('ru-RU') + ' ₽';
+    return num.toLocaleString('ru-RU') + ' so\'m';
+  };
 
   let AUTH_USER = null;
   const getToken = () => localStorage.getItem('token');
@@ -103,7 +106,7 @@
     if (!el) { el = document.createElement('div'); el.className = 'toast'; document.body.appendChild(el); }
     el.textContent = msg;
     el.style.opacity = 1;
-    setTimeout(() => { el.style.opacity = 0; }, 3000);
+    setTimeout(() => el.style.opacity = 0, 3000);
   }
 
   const getCart = () => JSON.parse(localStorage.getItem('cart') || '[]');
@@ -160,7 +163,7 @@
         <nav class="nav-links">
           <a href="/">${t('home')}</a>
           <a href="/order.html" style="color:var(--accent); font-weight:bold;">Zakaz berish</a>
-          
+
           <!-- Sevimlilar yurakchasi -->
           <a href="/favorites.html" title="${t('favorites')}" style="font-size: 18px; padding: 6px 12px;">
             🤍 <span id="fav-badge" class="badge hidden">0</span>
@@ -193,28 +196,30 @@
   }
 
   async function renderFooter() {
-  const host = document.getElementById('main-footer');
-  if (!host) return;
-  const lang = getLang();
-  let phone = '+998 90 123 45 67';
-  try { const res = await fetch('/api/config'); const data = await res.json(); if (data.phone) phone = data.phone; } catch (e) {}
-  
-  host.innerHTML = 
-    <div class="footer-inner">
-      <div class="footer-phone">${phone}</div>
-      <div class="payment-logos"><span class="pay-logo">HUMO</span><span class="pay-logo">UZCARD</span><span class="pay-logo">VISA</span><span class="pay-logo">MASTERCARD</span></div>
-      <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
-        <a href="tg://user?id=8631399966" target="_blank" class="btn" style="padding: 6px 12px; font-size: 13px; border-radius: 8px;">💬 Yordam uchun</a>
-        <div class="lang-switch">
-          <button data-lang="uz" class="${lang === 'uz' ? 'active' : ''}">UZ</button>
-          <button data-lang="ru" class="${lang === 'ru' ? 'active' : ''}">RU</button>
-          <button data-lang="en" class="${lang === 'en' ? 'active' : ''}">EN</button>
+    const host = document.getElementById('main-footer');
+    if (!host) return;
+    const lang = getLang();
+    let phone = '+998 90 123 45 67';
+    try { const res = await fetch('/api/config'); const data = await res.json(); if (data.phone) phone = data.phone; } catch (e) {}
+
+    host.innerHTML = `
+      <div class="footer-inner">
+        <div class="footer-phone">${phone}</div>
+        <div class="payment-logos"><span class="pay-logo">HUMO</span><span class="pay-logo">UZCARD</span><span class="pay-logo">VISA</span><span class="pay-logo">MASTERCARD</span></div>
+        <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+          <!-- Yordam tugmasi -->
+          <a href="tg://user?id=8631399966" class="btn" style="padding: 6px 12px; font-size: 13px; border-radius: 8px; color: var(--accent-2); border-color: var(--accent);">${t('help_btn')}</a>
+
+          <div class="lang-switch">
+            <button data-lang="uz" class="${lang === 'uz' ? 'active' : ''}">UZ</button>
+            <button data-lang="ru" class="${lang === 'ru' ? 'active' : ''}">RU</button>
+            <button data-lang="en" class="${lang === 'en' ? 'active' : ''}">EN</button>
+          </div>
         </div>
       </div>
-    </div>
-  ;
-  host.querySelectorAll('.lang-switch button').forEach(btn => btn.onclick = () => { localStorage.setItem('lang', btn.dataset.lang); location.reload(); });
-}
+    `;
+    host.querySelectorAll('.lang-switch button').forEach(btn => btn.onclick = () => { localStorage.setItem('lang', btn.dataset.lang); location.reload(); });
+  }
 
   function initBgAnimation() {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -245,7 +250,7 @@
 
     async function load(query = '') {
       try {
-        const res = await api(`/api/products?q=${encodeURIComponent(query)}&genre=${encodeURIComponent(currentGenre)}`);
+        const res = await api(`/api/products?q=${encodeURIComponent(query)}&genre=${currentGenre}`);
         if (res.products.length === 0) { grid.innerHTML = ''; empty.classList.remove('hidden'); return; }
         empty.classList.add('hidden');
 
@@ -253,14 +258,14 @@
         grid.innerHTML = res.products.map(p => {
           let priceHtml = `<div class="card-price">${formatPrice(p.price, p.currency)}</div>`;
           if (p.discount > 0) {
-            priceHtml = `<div class="card-price" style="color:#ff4d4f;">${fmtMoney(p.price)} <span style="text-decoration:line-through; color:#888; font-size:14px; margin-left:5px;">${fmtMoney(p.originalPrice)}</span><span style="background:#ff4d4f; color:white; padding:2px 5px; border-radius:5px; font-size:12px; margin-left:5px;">-${p.discount}%</span></div>`;
+            priceHtml = `<div class="card-price" style="color:#ff4d4f;">${formatPrice(p.price, p.currency)} <span style="text-decoration:line-through; color:#888; font-size:14px; margin-left:5px;">${formatPrice(p.originalPrice, p.currency)}</span><span style="background:#ff4d4f; color:white; padding:2px 5px; border-radius:5px; font-size:12px; margin-left:5px;">-${p.discount}%</span></div>`;
           }
           const isFav = favs.includes(p.id);
           return `
           <div class="card">
-            <button class="fav-btn ${isFav ? 'active' : ''}" data-fav="${esc(p.id)}">${isFav ? '❤️' : '🤍'}</button>
-            <a href="/product.html?id=${encodeURIComponent(p.id)}" style="display:block; height:100%; text-decoration:none; color:inherit;">
-              <img src="${esc(p.image)}" class="card-img" alt="${esc(p.name)}">
+            <button class="fav-btn ${isFav ? 'active' : ''}" data-fav="${p.id}">${isFav ? '❤️' : '🤍'}</button>
+            <a href="/product.html?id=${p.id}" style="display:block; height:100%; text-decoration:none; color:inherit;">
+              <img src="${p.image}" class="card-img" alt="${esc(p.name)}">
               <div class="card-body">
                 <div class="card-title">${esc(p.name)}</div>
                 <div class="card-genre">${t(p.genre)}</div>
@@ -270,7 +275,6 @@
           </div>`;
         }).join('');
 
-        // Yurakchalarni bosish
         grid.querySelectorAll('[data-fav]').forEach(btn => {
           btn.onclick = (e) => {
             e.preventDefault(); e.stopPropagation();
@@ -279,7 +283,6 @@
             btn.classList.toggle('active', isNowFav);
           };
         });
-
       } catch (e) { toast(e.message); }
     }
 
@@ -291,10 +294,7 @@
           currentGenre = e.target.dataset.genre;
           load(document.getElementById('search-input').value.trim());
 
-          // Mobil menyuni yopish
-          if (window.innerWidth <= 768) {
-            sidebar.classList.remove('open');
-          }
+          if (window.innerWidth <= 768) sidebar.classList.remove('open');
         }
       });
       sidebar.querySelector('[data-genre="all"]')?.classList.add('active');
@@ -308,34 +308,20 @@
     const grid = document.getElementById('fav-grid');
     const empty = document.getElementById('empty-fav');
     const favs = getFavs();
-    if (!favs.length) {
-      grid.innerHTML = '';
-      empty.classList.remove('hidden');
-      return;
-    }
+    if (!favs.length) { empty.classList.remove('hidden'); return; }
 
     try {
-      // Barcha mahsulotlarni olib, faqat sevimlilarni filter qilamiz
       const res = await api('/api/products');
       const favProducts = res.products.filter(p => favs.includes(p.id));
-
-      if (!favProducts.length) {
-        grid.innerHTML = '';
-        empty.classList.remove('hidden');
-        return;
-      }
-      empty.classList.add('hidden');
+      if (!favProducts.length) { empty.classList.remove('hidden'); return; }
 
       grid.innerHTML = favProducts.map(p => {
         let priceHtml = `<div class="card-price">${formatPrice(p.price, p.currency)}</div>`;
-        if (p.discount > 0) {
-          priceHtml = `<div class="card-price" style="color:#ff4d4f;">${fmtMoney(p.price)} <span style="text-decoration:line-through; color:#888; font-size:14px; margin-left:5px;">${fmtMoney(p.originalPrice)}</span></div>`;
-        }
         return `
         <div class="card">
-          <button class="fav-btn active" data-fav="${esc(p.id)}">❤️</button>
-          <a href="/product.html?id=${encodeURIComponent(p.id)}" style="display:block; height:100%; text-decoration:none; color:inherit;">
-            <img src="${esc(p.image)}" class="card-img" alt="${esc(p.name)}">
+          <button class="fav-btn active" data-fav="${p.id}">❤️</button>
+          <a href="/product.html?id=${p.id}" style="display:block; height:100%; text-decoration:none; color:inherit;">
+            <img src="${p.image}" class="card-img" alt="${esc(p.name)}">
             <div class="card-body">
               <div class="card-title">${esc(p.name)}</div>
               <div class="card-genre">${t(p.genre)}</div>
@@ -349,34 +335,30 @@
         btn.onclick = (e) => {
           e.preventDefault(); e.stopPropagation();
           toggleFav(btn.dataset.fav);
-          initFavorites(); // Sahifani qayta yuklash
+          initFavorites();
         };
       });
-
     } catch (e) { toast(e.message); }
   }
 
   async function initProduct() {
     const id = new URLSearchParams(location.search).get('id');
     const host = document.getElementById('product-detail');
-    if (!id) return (host.innerHTML = '<p>Xato</p>');
+    if (!id) return host.innerHTML = '<p>Xato</p>';
     try {
-      const res = await api(`/api/products/${encodeURIComponent(id)}`);
+      const res = await api(`/api/products/${id}`);
       const p = res.product;
       const isFav = getFavs().includes(p.id);
 
-      let priceHtml = `<div class="price">${formatPrice(item.price, item.currency)}</div>
-
-// Jami hisoblash qismida (umumiy summa bitta valyutada ko'rsatiladi, chunki aralashsa hisoblash qiyin, lekin vizual chiroyli turadi):
-totalEl.textContent = formatPrice(total, cart[0]?.currency);`;
+      let priceHtml = `<div class="price">${formatPrice(p.price, p.currency)}</div>`;
       if (p.discount > 0) {
-        priceHtml = `<div class="price" style="color:#ff4d4f;">${fmtMoney(p.price)} <span style="text-decoration:line-through; color:#888; font-size:20px; margin-left:10px;">${fmtMoney(p.originalPrice)}</span><span style="background:#ff4d4f; color:white; padding:3px 8px; border-radius:5px; font-size:16px; margin-left:10px;">-${p.discount}%</span></div>`;
+        priceHtml = `<div class="price" style="color:#ff4d4f;">${formatPrice(p.price, p.currency)} <span style="text-decoration:line-through; color:#888; font-size:20px; margin-left:10px;">${formatPrice(p.originalPrice, p.currency)}</span><span style="background:#ff4d4f; color:white; padding:3px 8px; border-radius:5px; font-size:16px; margin-left:10px;">-${p.discount}%</span></div>`;
       }
       let descHtml = p.description ? `<div class="mt-2" style="line-height:1.6; color:#aaa; margin-bottom:20px;">${esc(p.description)}</div>` : '';
 
       host.innerHTML = `
         <div class="product-layout">
-          <div class="product-image"><img src="${esc(p.image)}" alt="${esc(p.name)}"></div>
+          <div class="product-image"><img src="${p.image}" alt="${esc(p.name)}"></div>
           <div class="product-info">
             <div class="genre-tag">${t(p.genre)}</div>
             <h1>${esc(p.name)}</h1>
@@ -390,29 +372,46 @@ totalEl.textContent = formatPrice(total, cart[0]?.currency);`;
           </div>
         </div>`;
 
-      document.getElementById('add-btn').onclick = () => { addToCart({ id: p.id, name: p.name, price: p.price, image: p.image, paymentType: p.paymentType }); toast(t('add_to_cart')); };
+      document.getElementById('add-btn').onclick = () => {
+        addToCart({ id: p.id, name: p.name, price: p.price, currency: p.currency, image: p.image, paymentType: p.paymentType });
+        toast(t('add_to_cart'));
+      };
       document.getElementById('fav-btn-detail').onclick = (e) => {
         const isNowFav = toggleFav(p.id);
         e.target.textContent = isNowFav ? '❤️' : '🤍';
       };
-
-    } catch (e) { host.innerHTML = `<p>${esc(e.message)}</p>`; }
+    } catch (e) { host.innerHTML = `<p>${e.message}</p>`; }
   }
 
   function initCart() {
     const list = document.getElementById('cart-list');
     const summary = document.getElementById('cart-summary');
     const totalEl = document.getElementById('cart-total-price');
+
     function render() {
       const cart = getCart();
       if (!cart.length) { list.innerHTML = `<p class="empty-msg">${t('cart_empty')}</p>`; summary.classList.add('hidden'); return; }
       summary.classList.remove('hidden');
       let total = 0;
+
       list.innerHTML = cart.map(item => {
         total += item.price * item.qty;
-        return `<div class="cart-item"><img src="${esc(item.image)}" alt=""><div class="cart-item-info"><h3>${esc(item.name)}</h3><div class="price">${fmtMoney(item.price)}</div><div class="qty-controls"><button data-id="${esc(item.id)}" data-act="minus">-</button><span>${item.qty}</span><button data-id="${esc(item.id)}" data-act="plus">+</button></div></div><button class="btn btn-danger" data-id="${esc(item.id)}" data-act="remove">${t('remove')}</button></div>`;
+        return `<div class="cart-item">
+          <img src="${item.image}" alt="">
+          <div class="cart-item-info">
+            <h3>${esc(item.name)}</h3>
+            <div class="price">${formatPrice(item.price, item.currency || 'UZS')}</div>
+            <div class="qty-controls">
+              <button data-id="${item.id}" data-act="minus">-</button>
+              <span>${item.qty}</span>
+              <button data-id="${item.id}" data-act="plus">+</button>
+            </div>
+          </div>
+          <button class="btn btn-danger" data-id="${item.id}" data-act="remove">${t('remove')}</button>
+        </div>`;
       }).join('');
-      totalEl.textContent = fmtMoney(total);
+
+      totalEl.textContent = formatPrice(total, cart[0]?.currency || 'UZS');
     }
 
     list.addEventListener('click', (e) => {
@@ -424,42 +423,40 @@ totalEl.textContent = formatPrice(total, cart[0]?.currency);`;
     });
 
     document.getElementById('checkout-btn').onclick = () => {
-      if (!getToken()) return (location.href = '/profile.html');
+      if (!getToken()) return location.href = '/profile.html';
       location.href = '/checkout.html';
     };
-
     render();
   }
 
   async function initCheckout() {
     const host = document.getElementById('main-content');
     const cart = getCart();
-    if (!cart.length) return (host.innerHTML = `<p>${t('cart_empty')}</p>`);
-
+    if (!cart.length) return host.innerHTML = `<p>${t('cart_empty')}</p>`;
     let total = 0, upfront = 0, remaining = 0;
+
     cart.forEach(item => {
-      const sum = item.price * item.qty;
-      total += sum;
+      const sum = item.price * item.qty; total += sum;
       const pt = item.paymentType || 'prepay100';
-      if (pt === 'prepay100') upfront += sum;
-      else if (pt === 'prepay50') { upfront += Math.floor(sum / 2); remaining += Math.ceil(sum / 2); }
-      else if (pt === 'postpay100') remaining += sum;
+      if (pt === 'prepay100') upfront += sum; else if (pt === 'prepay50') { upfront += Math.floor(sum / 2); remaining += Math.ceil(sum / 2); } else if (pt === 'postpay100') remaining += sum;
     });
+
+    const curr = cart[0]?.currency || 'UZS';
 
     host.innerHTML = `
       <h2>${t('checkout')}</h2>
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
         <div>
-          <div class="form-group"><label>${t('name')}</label><input type="text" id="c-name" class="input" placeholder="Ismingizni kiriting"></div>
-          <div class="form-group"><label>${t('phone')}</label><input type="text" id="c-phone" class="input" value="${esc(AUTH_USER?.phone || '')}"></div>
+          <div class="form-group"><label>${t('name')}</label><input type="text" id="c-name" class="input"></div>
+          <div class="form-group"><label>${t('phone')}</label><input type="text" id="c-phone" class="input" value="${AUTH_USER?.phone || ''}"></div>
           <button class="btn btn-primary" id="loc-btn">${t('get_location')}</button>
           <div id="map-preview" style="margin-top: 15px;"></div>
         </div>
         <div>
           <div class="cart-summary" style="text-align: left;">
-            <p><strong>${t('cart_total')}:</strong> ${formatPrice(total, cart[0]?.currency)}</p>
-            <p><strong>${t('upfront')}:</strong> ${fmtMoney(upfront)}</p>
-            <p><strong>${t('remaining')}:</strong> ${fmtMoney(remaining)}</p>
+            <p><strong>${t('cart_total')}:</strong> ${formatPrice(total, curr)}</p>
+            <p><strong>${t('upfront')}:</strong> ${formatPrice(upfront, curr)}</p>
+            <p><strong>${t('remaining')}:</strong> ${formatPrice(remaining, curr)}</p>
             <hr style="margin:15px 0; border-color:#333;">
             <button id="order-btn" class="btn btn-primary btn-block">${t('submit_order')}</button>
           </div>
@@ -485,7 +482,7 @@ totalEl.textContent = formatPrice(total, cart[0]?.currency);`;
         await api('/api/orders', { method: 'POST', body: { items: cart.map(x => ({ id: x.id, qty: x.qty, name: x.name })), buyerName: name, buyerPhone: phone, lat, lng } });
         localStorage.removeItem('cart');
         toast(t('order_success'));
-        setTimeout(() => { location.href = '/'; }, 1000);
+        setTimeout(() => location.href = '/', 1000);
       } catch (e) { toast(e.message); }
     };
   }
@@ -527,17 +524,17 @@ totalEl.textContent = formatPrice(total, cart[0]?.currency);`;
 
         const interval = setInterval(async () => {
           try {
-            const s = await api(`/api/auth/status?nonce=${encodeURIComponent(res.nonce)}`);
+            const s = await api(`/api/auth/status?nonce=${res.nonce}`);
             if (s.status === 'waiting_code') {
               clearInterval(interval);
-              location.href = `/login.html?nonce=${encodeURIComponent(res.nonce)}`;
+              location.href = `/login.html?nonce=${res.nonce}`;
             }
           } catch (e) {}
         }, 2000);
 
         setTimeout(() => clearInterval(interval), 10 * 60 * 1000);
       } catch (e) {
-        statusDiv.innerHTML = `<p style="color: var(--danger);">Xatolik: ${esc(e.message)}</p>`;
+        statusDiv.innerHTML = `<p style="color: var(--danger);">Xatolik: ${e.message}</p>`;
       }
     };
 
@@ -548,8 +545,7 @@ totalEl.textContent = formatPrice(total, cart[0]?.currency);`;
   function initLogin() {
     const host = document.getElementById('main-content');
     const nonce = new URLSearchParams(location.search).get('nonce');
-    if (!nonce) return (host.innerHTML = '<p style="text-align:center; margin-top:50px;">Xato: Havola topilmadi. <a href="/profile.html">Profilga qaytish</a></p>');
-
+    if (!nonce) return host.innerHTML = '<p style="text-align:center; margin-top:50px;">Xato: Havola topilmadi. <a href="/profile.html">Profilga qaytish</a></p>';
     host.innerHTML = `
       <div class="card" style="max-width: 400px; margin: 40px auto; text-align: center; padding: 30px;">
         <h2>${t('enter_code')}</h2>
@@ -563,7 +559,7 @@ totalEl.textContent = formatPrice(total, cart[0]?.currency);`;
 
     document.getElementById('verify-btn').onclick = async () => {
       const code = document.getElementById('code-input').value.trim();
-      if (!/^\d{6}$/.test(code)) return (document.getElementById('err-msg').textContent = "Iltimos, 6 xonali kodni to'g'ri kiriting.");
+      if (!/^\d{6}$/.test(code)) return document.getElementById('err-msg').textContent = "Iltimos, 6 xonali kodni to'g'ri kiriting.";
 
       const btn = document.getElementById('verify-btn');
       btn.disabled = true;
@@ -573,7 +569,7 @@ totalEl.textContent = formatPrice(total, cart[0]?.currency);`;
         const res = await api('/api/auth/verify', { method: 'POST', body: { nonce, code } });
         localStorage.setItem('token', res.token);
         toast(t('success_auth'));
-        setTimeout(() => { location.href = '/'; }, 1000);
+        setTimeout(() => location.href = '/', 1000);
       } catch (e) {
         document.getElementById('err-msg').textContent = e.message;
         btn.disabled = false;
@@ -583,132 +579,132 @@ totalEl.textContent = formatPrice(total, cart[0]?.currency);`;
   }
 
   function initSeller() {
-  const host = document.getElementById('main-content');
-  if (!AUTH_USER || AUTH_USER.role !== 'seller') return host.innerHTML = '<p>Ruxsat yo\'q. Iltimos, Profil bo\'limidan Savdogar rolini tanlang.</p>';
-  
-  host.innerHTML = `
-    <h2>${t('seller_panel')}</h2>
-    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top:20px;">
-      <div class="card" style="padding:20px;">
-        <div class="form-group"><label>${t('product_name')}</label><input type="text" id="p-name" class="input"></div>
-        <div class="form-group"><label>${t('price')}</label><input type="number" id="p-price" class="input"></div>
-        <div class="form-group">
-          <label>Valyuta</label>
-          <select id="p-currency" class="input">
-            <option value="UZS">So'm (UZS)</option>
-            <option value="USD">Dollar (USD)</option>
-            <option value="RUB">Rubl (RUB)</option>
-          </select>
+    const host = document.getElementById('main-content');
+    if (!AUTH_USER || AUTH_USER.role !== 'seller') return host.innerHTML = '<p>Ruxsat yo\'q. Iltimos, Profil bo\'limidan Savdogar rolini tanlang.</p>';
+
+    host.innerHTML = `
+      <h2>${t('seller_panel')}</h2>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top:20px;">
+        <div class="card" style="padding:20px;">
+          <div class="form-group"><label>${t('product_name')}</label><input type="text" id="p-name" class="input"></div>
+          <div class="form-group"><label>${t('price')}</label><input type="number" id="p-price" class="input"></div>
+          <div class="form-group">
+            <label>${t('currency')}</label>
+            <select id="p-currency" class="input">
+              <option value="UZS">So'm (UZS)</option>
+              <option value="USD">Dollar (USD)</option>
+              <option value="RUB">Rubl (RUB)</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Chegirma (%)</label><input type="number" id="p-discount" class="input" min="0" max="100" value="0"></div>
+          <div class="form-group"><label>Asar haqida izoh</label><textarea id="p-desc" class="input" rows="3"></textarea></div>
+          <div class="form-group">
+            <label>${t('genre')}</label>
+            <select id="p-genre" class="input">
+              <option value="portrait">${t('portrait')}</option><option value="landscape">${t('landscape')}</option>
+              <option value="stilllife">${t('stilllife')}</option><option value="abstract">${t('abstract')}</option>
+              <option value="animal">${t('animal')}</option><option value="modern">${t('modern')}</option>
+              <option value="sculpture">${t('sculpture')}</option>
+              <option value="photography">${t('photography')}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>${t('payment_type')}</label>
+            <select id="p-payment" class="input">
+              <option value="prepay100">${t('prepay100')}</option><option value="prepay50">${t('prepay50')}</option><option value="postpay100">${t('postpay100')}</option>
+            </select>
+          </div>
+          <div class="form-group"><label>${t('image_req')}</label><input type="file" id="p-img" accept="image/*"></div>
+          <img id="p-preview" class="hidden" style="max-width:100%; border-radius:8px; margin-bottom:15px;">
+          <button id="p-save" class="btn btn-primary btn-block">${t('create')}</button>
         </div>
-        <div class="form-group"><label>Chegirma (%)</label><input type="number" id="p-discount" class="input" min="0" max="100" value="0"></div>
-        <div class="form-group"><label>Asar haqida izoh</label><textarea id="p-desc" class="input" rows="3"></textarea></div>
-        <div class="form-group">
-          <label>${t('genre')}</label>
-          <select id="p-genre" class="input">
-            <option value="portrait">${t('portrait')}</option><option value="landscape">${t('landscape')}</option>
-            <option value="stilllife">${t('stilllife')}</option><option value="abstract">${t('abstract')}</option>
-            <option value="animal">${t('animal')}</option><option value="modern">${t('modern')}</option>
-            <option value="sculpture">${t('sculpture')}</option>
-            <option value="photography">${t('photography')}</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>${t('payment_type')}</label>
-          <select id="p-payment" class="input">
-            <option value="prepay100">${t('prepay100')}</option><option value="prepay50">${t('prepay50')}</option><option value="postpay100">${t('postpay100')}</option>
-          </select>
-        </div>
-        <div class="form-group"><label>${t('image_req')}</label><input type="file" id="p-img" accept="image/*"></div>
-        <img id="p-preview" class="hidden" style="max-width:100%; border-radius:8px; margin-bottom:15px;">
-        <button id="p-save" class="btn btn-primary btn-block">${t('create')}</button>
+        <div><h3>${t('my_works')}</h3><div id="my-list" style="margin-top:15px;"></div></div>
       </div>
-      <div><h3>${t('my_works')}</h3><div id="my-list" style="margin-top:15px;"></div></div>
-    </div>`
-  ;
+    `;
 
-  let base64Img = null;
-  document.getElementById('p-img').onchange = (e) => {
-    const file = e.target.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let w = img.width, h = img.height, max = 900;
-        if (w > max || h > max) { if (w > h) { h = h * max / w; w = max; } else { w = w * max / h; h = max; } }
-        canvas.width = w; canvas.height = h; canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        base64Img = canvas.toDataURL('image/jpeg', 0.85);
-        const prev = document.getElementById('p-preview'); prev.src = base64Img; prev.classList.remove('hidden');
-      };
-      img.src = ev.target.result;
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const loadMy = async () => {
-    try {
-      const res = await api('/api/seller/products');
-      const list = document.getElementById('my-list');
-      if (!res.products.length) return list.innerHTML = <p>${t('no_works')}</p>;
-      
-      list.innerHTML = res.products.map(p => {
-        let discBadge = p.discount > 0 ? <span style="background:#ff4d4f; color:white; padding:2px 5px; border-radius:5px; font-size:12px; margin-left:5px;">-${p.discount}%</span> : '';
-        return <div class="cart-item" style="padding:10px; margin-bottom:10px;">
-          <img src="${p.image}" style="width:60px; height:60px;">
-          <div style="flex:1;"><b>${esc(p.name)}</b> ${discBadge}<br><small>${t(p.genre)}</small></div>
-          <button class="btn btn-danger" data-del="${p.id}">X</button>
-        </div>;
-      }).join('');
-
-      list.querySelectorAll('[data-del]').forEach(btn => {
-        btn.onclick = async () => {
-          if (!confirm('O\'chirishni tasdiqlaysizmi?')) return;
-          try {
-            await api(/api/seller/products/`${btn.dataset.del}`, { method: 'DELETE' });
-            toast('O\'chirildi'); loadMy();
-          } catch (e) { toast(e.message); }
+    let base64Img = null;
+    document.getElementById('p-img').onchange = (e) => {
+      const file = e.target.files[0]; if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let w = img.width, h = img.height, max = 900;
+          if (w > max || h > max) { if (w > h) { h = h * max / w; w = max; } else { w = w * max / h; h = max; } }
+          canvas.width = w; canvas.height = h; canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          base64Img = canvas.toDataURL('image/jpeg', 0.85);
+          const prev = document.getElementById('p-preview'); prev.src = base64Img; prev.classList.remove('hidden');
         };
-      });
-    } catch (e) { toast(e.message); }
-  };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    };
 
-  document.getElementById('p-save').onclick = async () => {
-    const name = document.getElementById('p-name').value.trim();
-    const price = parseInt(document.getElementById('p-price').value);
-    const currency = document.getElementById('p-currency').value;
-    const discount = parseInt(document.getElementById('p-discount').value) || 0;
-    const description = document.getElementById('p-desc').value.trim();
-    const genre = document.getElementById('p-genre').value;
-    const paymentType = document.getElementById('p-payment').value;
-    
-    if (!name , !price , !base64Img) return toast(t('required'));
-    
-    try {
-      await api('/api/seller/products', { method: 'POST', body: { name, price, currency, discount, description, genre, paymentType, image: base64Img } });
-      toast('OK'); loadMy();
-      document.getElementById('p-name').value = ''; document.getElementById('p-price').value = '';
-      document.getElementById('p-discount').value = '0'; document.getElementById('p-desc').value = '';
-      base64Img = null; document.getElementById('p-preview').classList.add('hidden');
-    } catch (e) { toast(e.message); }
-  };
-  loadMy();
-}
+    const loadMy = async () => {
+      try {
+        const res = await api('/api/seller/products');
+        const list = document.getElementById('my-list');
+        if (!res.products.length) return list.innerHTML = `<p>${t('no_works')}</p>`;
+
+        list.innerHTML = res.products.map(p => {
+          let discBadge = p.discount > 0 ? `<span style="background:#ff4d4f; color:white; padding:2px 5px; border-radius:5px; font-size:12px; margin-left:5px;">-${p.discount}%</span>` : '';
+          return `<div class="cart-item" style="padding:10px; margin-bottom:10px;">
+            <img src="${p.image}" style="width:60px; height:60px;">
+            <div style="flex:1;"><b>${esc(p.name)}</b> ${discBadge}<br><small>${t(p.genre)}</small></div>
+            <button class="btn btn-danger" data-del="${p.id}">X</button>
+          </div>`;
+        }).join('');
+
+        list.querySelectorAll('[data-del]').forEach(btn => {
+          btn.onclick = async () => {
+            if (!confirm('O\'chirishni tasdiqlaysizmi?')) return;
+            try {
+              await api(`/api/seller/products/${btn.dataset.del}`, { method: 'DELETE' });
+              toast('O\'chirildi'); loadMy();
+            } catch (e) { toast(e.message); }
+          };
+        });
+      } catch (e) { toast(e.message); }
+    };
+
+    document.getElementById('p-save').onclick = async () => {
+      const name = document.getElementById('p-name').value.trim();
+      const price = parseInt(document.getElementById('p-price').value);
+      const currency = document.getElementById('p-currency').value;
+      const discount = parseInt(document.getElementById('p-discount').value) || 0;
+      const description = document.getElementById('p-desc').value.trim();
+      const genre = document.getElementById('p-genre').value;
+      const paymentType = document.getElementById('p-payment').value;
+
+      if (!name || !price || !base64Img) return toast(t('required'));
+
+      try {
+        await api('/api/seller/products', { method: 'POST', body: { name, price, currency, discount, description, genre, paymentType, image: base64Img } });
+        toast('OK'); loadMy();
+        document.getElementById('p-name').value = ''; document.getElementById('p-price').value = '';
+        document.getElementById('p-discount').value = '0'; document.getElementById('p-desc').value = '';
+        base64Img = null; document.getElementById('p-preview').classList.add('hidden');
+      } catch (e) { toast(e.message); }
+    };
+    loadMy();
+  }
 
   async function initSold() {
     const host = document.getElementById('main-content');
-    if (!AUTH_USER || AUTH_USER.role !== 'seller') return (host.innerHTML = '<p>Ruxsat yo\'q</p>');
+    if (!AUTH_USER || AUTH_USER.role !== 'seller') return host.innerHTML = '<p>Ruxsat yo\'q</p>';
     try {
       const res = await api('/api/seller/sold');
-      if (!res.orders.length) return (host.innerHTML = `<p>${t('no_works')}</p>`);
+      if (!res.orders.length) return host.innerHTML = `<p>${t('no_works')}</p>`;
       host.innerHTML = `<h2>${t('sold_items')}</h2><div style="margin-top:20px;">` + res.orders.map(o => `
         <div class="card" style="padding:15px; margin-bottom:15px;">
           <h3>${esc(o.productName)}</h3>
-          <p><strong>${t('price')}:</strong> ${fmtMoney(o.price)}</p>
+          <p><strong>${t('price')}:</strong> ${formatPrice(o.price, o.currency || 'UZS')}</p>
           <p><strong>${t('payment_type')}:</strong> ${t(o.paymentType)}</p>
           <p><strong>${t('buyer')}:</strong> ${esc(o.buyerName)} (${esc(o.buyerPhone)})</p>
-          <iframe width="100%" height="150" style="border:0;border-radius:8px; margin-top:10px;" src="https://www.google.com/maps?q=${encodeURIComponent(o.lat)},${encodeURIComponent(o.lng)}&z=15&output=embed"></iframe>
-        </div>`).join('') + `</div>`;
-    } catch (e) { host.innerHTML = `<p>${esc(e.message)}</p>`; }
+          <iframe width="100%" height="150" style="border:0;border-radius:8px; margin-top:10px;" src="https://www.google.com/maps?q=${o.lat},${o.lng}&z=15&output=embed"></iframe>
+        </div>`).join('') + '</div>';
+    } catch (e) { host.innerHTML = `<p>${e.message}</p>`; }
   }
 
   (async () => {
