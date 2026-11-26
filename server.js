@@ -400,55 +400,39 @@ app.post('/api/auth/verify', rateLimit(10), async (req, res) => {
 
 app.get('/api/me', auth(), (req, res) => res.json({ user: { phone: req.user.phone, role: req.user.role } }));
 
-app.get('/api/products', async (req, res) => {
-  let query = { status: 'available' };
+app.get('/api/products', (req, res) => {
+  let list = DATA.products.filter(p => p.status === 'available');
   const { q, genre } = req.query;
-  if (q) query.name = { $regex: q, $options: 'i' };
-  if (genre && genre !== 'all') query.genre = genre;
-  
-  const list = await productsCol.find(query).sort({ createdAt: -1 }).toArray();
-  res.json({
-    products: list.map(p => {
-      const d = p.discount || 0;
-      const finalPrice = d > 0 ? Math.round(p.price * (1 - d / 100)) : p.price;
-      return {
-        id: p.id,
-        name: p.name,
-        price: finalPrice,
-        originalPrice: p.price,
-        discount: d,
-        genre: p.genre,
-        paymentType: p.paymentType,
-        image: p.image
-      };
-    })
-  });
+  if (q) list = list.filter(p => p.name.toLowerCase().includes(q.toLowerCase()));
+  if (genre && genre !== 'all') list = list.filter(p => p.genre === genre);
+  list.sort((a, b) => b.createdAt - a.createdAt);
+  res.json({ products: list.map(p => {
+    const d = p.discount || 0; const finalPrice = d > 0 ? Math.round(p.price * (1 - d / 100)) : p.price;
+    return { id: p.id, name: p.name, price: finalPrice, originalPrice: p.price, discount: d, genre: p.genre, paymentType: p.paymentType, image: p.image, currency: p.currency || 'UZS' };
+  })});
 });
 
-app.get('/api/products/:id', async (req, res) => {
-  const p = await productsCol.findOne({ id: req.params.id, status: 'available' });
+app.get('/api/products/:id', (req, res) => {
+  const p = DATA.products.find(x => x.id === req.params.id && x.status === 'available');
   if (!p) return res.status(404).json({ error: 'Topilmadi' });
-  const d = p.discount || 0;
-  const finalPrice = d > 0 ? Math.round(p.price * (1 - d / 100)) : p.price;
-  res.json({
-    product: {
-      id: p.id,
-      name: p.name,
-      price: finalPrice,
-      originalPrice: p.price,
-      discount: d,
-      genre: p.genre,
-      paymentType: p.paymentType,
-      image: p.image,
-      description: p.description || ''
-    }
-  });
+  const d = p.discount || 0; const finalPrice = d > 0 ? Math.round(p.price * (1 - d / 100)) : p.price;
+  res.json({ product: `{ id: p.id, name: p.name, price: finalPrice, originalPrice: p.price, discount: d, genre: p.genre, paymentType: p.paymentType, image: p.image, description: p.description  , currency: p.currency , 'UZS' }` });
 });
 
-app.get('/api/seller/products', auth(), async (req, res) => {
-  if (req.user.role !== 'seller') return res.status(403).json({ error: "Ruxsat yo'q" });
-  const list = await productsCol.find({ sellerPhone: req.user.phone }).sort({ createdAt: -1 }).toArray();
-  res.json({ products: list });
+app.post('/api/seller/products', auth(), rateLimit(20), async (req, res) => {
+  if (req.user.role !== 'seller') return res.status(403).json({ error: 'Ruxsat yo\'q' });
+  const { name, price, genre, paymentType, image, description, discount, currency } = req.body;
+  const disc = Number(discount) || 0;
+  if (!name , !price , !image) return res.status(400).json({ error: 'Ma\'lumotlar to\'liq emas' });
+  
+  const id = crypto.randomBytes(8).toString('hex');
+  const product = { 
+    id, name, price, currency: currency || 'UZS', genre, paymentType, image, 
+    description: description || '', discount: disc, sellerPhone: req.user.phone, 
+    status: 'available', createdAt: Date.now() 
+  };
+  
+  DATA.products.push(product); await saveData(); res.json({ product });
 });
 
 app.post('/api/seller/products', auth(), rateLimit(20), async (req, res) => {
