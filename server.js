@@ -511,7 +511,7 @@ app.post('/api/orders', auth(), rateLimit(10), async (req, res) => {
                         `<b>To'lov turi:</b> ${p.paymentType}\n\n` +
                         `<b>Mijoz:</b> ${buyerName}\n `+
                         `<b>Telefon:</b> <code>${buyerPhone}</code>\n` +
-                        `<b>Manzil:</b> <a href="${mapUrl}">Xaritada ko'rish</a>;`
+                        `<b>Mijoz bilan 24 soat ichida bog'lanishingizni so'raymiz 😁`
                         
       sendTgMsg(AUTH_BOT_TOKEN, seller.telegramId, sellerMsg);
     }
