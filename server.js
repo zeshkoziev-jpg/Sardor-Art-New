@@ -19,8 +19,8 @@ if (fs.existsSync('.env')) {
 }
 
 const PORT = process.env.PORT || 3000;
-const AUTH_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const AUTH_BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME || 'SardorArtBot';
+const AUTH_BOT_TOKEN = process.env.AUTH_BOT_TOKEN;
+const AUTH_BOT_USERNAME = process.env.AUTH_BOT_USERNAME || 'SardorArtBot';
 const ORDER_BOT_TOKEN = process.env.ORDER_BOT_TOKEN;
 const ORDER_BOT_USERNAME = process.env.ORDER_BOT_USERNAME || 'SardorOrderBot';
 const SITE_URL = process.env.SITE_URL || `http://localhost:${PORT}`;
