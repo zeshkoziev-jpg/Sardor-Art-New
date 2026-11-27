@@ -477,41 +477,43 @@ app.get('/api/seller/sold', auth(), async (req, res) => {
 });
 
 app.post('/api/orders', auth(), rateLimit(10), async (req, res) => {
-  if (req.user.role !== 'customer') return res.status(403).json({ error: "Ruxsat yo'q" });
+  if (req.user.role !== 'customer') return res.status(403).json({ error: 'Ruxsat yo\'q' });
   const { items, buyerName, buyerPhone, lat, lng } = req.body;
-  if (!Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({ error: "Savat bo'sh" });
-  }
   const createdOrders = [];
   
   for (const item of items) {
     const p = await productsCol.findOne({ id: item.id, status: 'available' });
     if (!p) return res.status(400).json({ error: `Asar topilmadi: ${item.name}` });
     
-    const d = p.discount || 0;
+    const d = p.discount || 0; 
     const finalPrice = d > 0 ? Math.round(p.price * (1 - d / 100)) : p.price;
+    
+    // Asarni sotilgan deb belgilash
     await productsCol.updateOne({ id: p.id }, { $set: { status: 'sold' } });
     
     const order = { 
-      id: crypto.randomBytes(8).toString('hex'),
-      productId: p.id,
-      productName: p.name, 
-      price: finalPrice,
-      currency: p.currency || 'UZS',
-      paymentType: p.paymentType, 
-      buyerName,
-      buyerPhone,
-      lat,
-      lng,
-      sellerPhone: p.sellerPhone,
-      createdAt: Date.now() 
+      id: crypto.randomBytes(8).toString('hex'), productId: p.id, productName: p.name, 
+      price: finalPrice, currency: p.currency || 'UZS', paymentType: p.paymentType, 
+      buyerName, buyerPhone, lat, lng, sellerPhone: p.sellerPhone, createdAt: Date.now() 
     };
     await ordersCol.insertOne(order);
     createdOrders.push(order);
     
+    // ==========================================
+    // SAVDOGARGA TELEGRAM ORQALI XABAR YUBORISH
+    // ==========================================
     const seller = await usersCol.findOne({ phone: p.sellerPhone });
     if (seller && seller.telegramId) {
-      await sendTgMsg(AUTH_BOT_TOKEN, seller.telegramId, `🎉 Asar sotildi!\n${p.name}\nMijoz: ${buyerName}`);
+      const mapUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+      const sellerMsg = `🎉 <b>Yangi buyurtma!</b>\n\n` +
+                        `<b>Asar:</b> ${p.name}\n `+
+                        `<b>Narxi:</b> ${finalPrice.toLocaleString()} ${p.currency || 'UZS'}\n `+
+                        `<b>To'lov turi:</b> ${p.paymentType}\n\n` +
+                        `<b>Mijoz:</b> ${buyerName}\n `+
+                        `<b>Telefon:</b> <code>${buyerPhone}</code>\n` +
+                        `<b>Manzil:</b> <a href="${mapUrl}">Xaritada ko'rish</a>;`
+                        
+      sendTgMsg(AUTH_BOT_TOKEN, seller.telegramId, sellerMsg);
     }
   }
   
