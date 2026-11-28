@@ -483,7 +483,7 @@ app.post('/api/orders', auth(), rateLimit(10), async (req, res) => {
   
   for (const item of items) {
     const p = await productsCol.findOne({ id: item.id, status: 'available' });
-    if (!p) return res.status(400).json({ error: `Asar topilmadi: ${item.name}` });
+    if (!p) return res.status(400).json({ error: Asar topilmadi: ${item.name} });
     
     const d = p.discount || 0; 
     const finalPrice = d > 0 ? Math.round(p.price * (1 - d / 100)) : p.price;
@@ -500,20 +500,33 @@ app.post('/api/orders', auth(), rateLimit(10), async (req, res) => {
     createdOrders.push(order);
     
     // ==========================================
-    // SAVDOGARGA TELEGRAM ORQALI XABAR YUBORISH
+    // 1. SAVDOGARGA XABAR YUBORISH
     // ==========================================
     const seller = await usersCol.findOne({ phone: p.sellerPhone });
     if (seller && seller.telegramId) {
-      const mapUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+      const mapUrl = https://www.google.com/maps?q=${lat},${lng};
       const sellerMsg = `🎉 <b>Yangi buyurtma!</b>\n\n` +
                         `<b>Asar:</b> ${p.name}\n `+
-                        `<b>Narxi:</b> ${finalPrice.toLocaleString()} ${p.currency || 'UZS'}\n `+
-                        `<b>To'lov turi:</b> ${p.paymentType}\n\n` +
+                        `<b>Narxi:</b> ${finalPrice.toLocaleString()} ${p.currency || 'UZS'}\n` +
+                        `<b>To'lov turi:</b> ${p.paymentType}\n\n `+
                         `<b>Mijoz:</b> ${buyerName}\n `+
-                        `<b>Telefon:</b> <code>${buyerPhone}</code>\n` +
-                        `<b>Mijoz bilan 24 soat ichida bog'lanishingizni so'raymiz 😁`
+                        `<b>Telefon:</b> <code>${buyerPhone}</code>\n\n` +
+                        `Manzilni sytdagi sotilganlar bo'limdan ko'rishingiz mumkun😁 \n`;
                         
       sendTgMsg(AUTH_BOT_TOKEN, seller.telegramId, sellerMsg);
+    }
+
+    // ==========================================
+    // 2. MIJOZGA TASDIQLASH XABARI YUBORISH
+    // ==========================================
+    const customer = await usersCol.findOne({ phone: req.user.phone });
+    if (customer && customer.telegramId) {
+      const customerMsg = `✅ <b>Buyurtmangiz qabul qilindi!</b>\n\n` +
+                          `<b>Asar:</b> ${p.name}\n `+
+                          `<b>Narxi:</b> ${finalPrice.toLocaleString()} ${p.currency || 'UZS'}\n\n `+
+                          `Tez orada savdogar siz bilan bog'lanadi. Xaridingiz uchun rahmat!`;
+      
+      sendTgMsg(AUTH_BOT_TOKEN, customer.telegramId, customerMsg);
     }
   }
   
