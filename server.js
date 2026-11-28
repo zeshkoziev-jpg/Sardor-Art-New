@@ -516,7 +516,7 @@ app.post('/api/orders', auth(), rateLimit(10), async (req, res) => {
       sendTgMsg(AUTH_BOT_TOKEN, seller.telegramId, sellerMsg);
     }
 
-    // ==========================================
+    // ============================================
     // 2. MIJOZGA TASDIQLASH XABARI YUBORISH
     // ==========================================
     const customer = await usersCol.findOne({ phone: req.user.phone });
